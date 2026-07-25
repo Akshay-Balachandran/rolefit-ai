@@ -1,0 +1,1319 @@
+import React, { useState, useEffect, useRef } from 'react';
+
+// --- Resume rendering for the formatted preview & PDF export ---
+// The generator now returns clean plain text (no markdown symbols). This renderer
+// detects the name (first line), section headings (known names), and "- " bullets,
+// and defensively strips any stray markdown (**, `) so none ever show. It stays
+// backward-compatible with older resumes that used #, ##, and * markdown.
+const RESUME_SECTIONS = new Set([
+  'SUMMARY', 'PROFESSIONAL SUMMARY', 'OBJECTIVE', 'PROFILE',
+  'EXPERIENCE', 'PROFESSIONAL EXPERIENCE', 'WORK EXPERIENCE', 'EMPLOYMENT HISTORY',
+  'EDUCATION', 'SKILLS', 'TECHNICAL SKILLS', 'CORE SKILLS', 'KEY SKILLS',
+  'CERTIFICATIONS', 'CERTIFICATION', 'PROJECTS', 'KEY PROJECTS', 'LANGUAGES',
+  'ACHIEVEMENTS', 'AWARDS', 'INTERESTS', 'VOLUNTEER EXPERIENCE', 'PUBLICATIONS',
+]);
+
+const cleanInline = (str) => str.replace(/\*\*/g, '').replace(/`/g, '');
+
+const renderInline = (text, keyPrefix) => {
+  const parts = [];
+  const regex = /\*\*(.+?)\*\*/g;
+  let last = 0, match, i = 0;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) parts.push(cleanInline(text.slice(last, match.index)));
+    parts.push(<strong key={`${keyPrefix}-b${i++}`}>{cleanInline(match[1])}</strong>);
+    last = regex.lastIndex;
+  }
+  if (last < text.length) parts.push(cleanInline(text.slice(last)));
+  return parts;
+};
+
+const renderResume = (raw) => {
+  const lines = (raw || '').split('\n');
+  const blocks = [];
+  let bullets = null;
+  let nameDone = false;
+  const flush = () => {
+    if (bullets) { blocks.push(<ul key={`ul-${blocks.length}`}>{bullets}</ul>); bullets = null; }
+  };
+  lines.forEach((line, idx) => {
+    const t = line.trim();
+    if (t === '') { flush(); return; }
+    // Bullets: "- ", "• " or legacy "* "
+    if (/^[-•*]\s+/.test(t)) {
+      if (!bullets) bullets = [];
+      bullets.push(<li key={`li-${idx}`}>{renderInline(t.replace(/^[-•*]\s+/, ''), `li-${idx}`)}</li>);
+      return;
+    }
+    const noHash = t.replace(/^#{1,6}\s*/, '');            // strip legacy leading #
+    const upper = noHash.replace(/\*\*/g, '').trim().toUpperCase();
+    // First non-empty line = the candidate's name
+    if (!nameDone) {
+      flush(); nameDone = true;
+      blocks.push(<h1 key={`h1-${idx}`}>{renderInline(noHash, `h1-${idx}`)}</h1>);
+      return;
+    }
+    // Section heading: a known heading name, or legacy markdown # / ##
+    if (t.startsWith('## ') || t.startsWith('# ') || RESUME_SECTIONS.has(upper)) {
+      flush();
+      blocks.push(<h2 key={`h2-${idx}`}>{renderInline(noHash, `h2-${idx}`)}</h2>);
+      return;
+    }
+    flush();
+    blocks.push(<p key={`p-${idx}`}>{renderInline(noHash, `p-${idx}`)}</p>);
+  });
+  flush();
+  return blocks;
+};
+
+// Learning-recommendation links for a missing skill (honest platform searches — no fabricated courses)
+const courseLink = (platform, skill) => {
+  const q = encodeURIComponent(skill);
+  if (platform === 'coursera') return `https://www.coursera.org/search?query=${q}`;
+  if (platform === 'udemy') return `https://www.udemy.com/courses/search/?q=${q}`;
+  return `https://www.google.com/search?q=learn+${q}`;
+};
+
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+const getManualSkillsAdded = (text, missingSkills = []) => {
+  if (!text) return [];
+  const added = [];
+  for (const skill of missingSkills) {
+    const regex = new RegExp(`\\b${escapeRegExp(skill)}\\b`, 'i');
+    if (regex.test(text)) {
+      added.push(skill);
+    }
+  }
+  return added;
+};
+
+const getProgressStatusMessage = (progress) => {
+  if (progress < 20) return "🔍 Analyzing profile and job description...";
+  if (progress < 45) return "🔑 Extracting priority keywords...";
+  if (progress < 75) return "✍️ Aligning skills and experience with Gemini...";
+  if (progress < 90) return "✨ Polishing and formatting sections...";
+  if (progress < 100) return "⏳ Finalizing your tailored resume...";
+  return "🎉 Done!";
+};
+
+
+// ── RoleFit AI Logo — High-Fidelity Target Segmented Compass & Curved Arrow ──
+// Exactly matches the reference image: segmented gear ring with notches,
+// person silhouette on the left, and a sweeping cyan arrow piercing top-right.
+const RoleFitLogo = ({ size = 38 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 44 44"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    style={{ flexShrink: 0 }}
+  >
+    <defs>
+      {/* Metallic blue-teal ring gradient */}
+      <linearGradient id="ringGrad" x1="6" y1="6" x2="38" y2="38" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#0D3560" />
+        <stop offset="35%" stopColor="#0B4B7B" />
+        <stop offset="70%" stopColor="#1592B8" />
+        <stop offset="100%" stopColor="#00F5D4" />
+      </linearGradient>
+
+      {/* Radiant cyan/teal arrow gradient */}
+      <linearGradient id="arrowGrad" x1="12" y1="34" x2="33" y2="9" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#0B4A7C" />
+        <stop offset="30%" stopColor="#0077CC" />
+        <stop offset="70%" stopColor="#00D4FF" />
+        <stop offset="100%" stopColor="#00FFCC" />
+      </linearGradient>
+
+      {/* Person silhouette gradient */}
+      <linearGradient id="silhouetteGrad" x1="12" y1="12" x2="22" y2="30" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#1E5D8C" />
+        <stop offset="100%" stopColor="#0A2C4D" />
+      </linearGradient>
+
+      {/* Arrow/Highlight glow */}
+      <filter id="cyanGlow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="1.5" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+
+      {/* Soft drop shadow for 3D depth */}
+      <filter id="logoShadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="1.5" stdDeviation="1.8" floodColor="#000000" floodOpacity="0.6" />
+      </filter>
+    </defs>
+
+    {/* Group with drop shadow for 3D effect */}
+    <g filter="url(#logoShadow)">
+      {/* ── Secondary diagonal support bar (compass line, bottom-right) ── */}
+      <line
+        x1="22" y1="22"
+        x2="31" y2="31"
+        stroke="url(#ringGrad)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        opacity="0.8"
+      />
+
+      {/* ── Outer segmented target/gear ring ── */}
+      <circle
+        cx="22"
+        cy="22"
+        r="13"
+        stroke="url(#ringGrad)"
+        strokeWidth="2.5"
+        fill="none"
+      />
+
+      {/* Outer notches/tabs (8 notches at regular angles) */}
+      <g stroke="url(#ringGrad)" strokeWidth="2.2" strokeLinecap="round">
+        {/* Top/Bottom/Left/Right notches */}
+        <line x1="22" y1="6.5" x2="22" y2="9" />
+        <line x1="22" y1="35" x2="22" y2="37.5" />
+        <line x1="6.5" y1="22" x2="9" y2="22" />
+        <line x1="35" y1="22" x2="37.5" y2="22" />
+        
+        {/* Diagonal notches */}
+        <line x1="11" y1="11" x2="12.8" y2="12.8" />
+        <line x1="31.2" y1="31.2" x2="33" y2="33" />
+        <line x1="11" y1="33" x2="12.8" y2="31.2" />
+        {/* Top-right notch is intentionally pierced by the arrow */}
+      </g>
+
+      {/* ── Person Silhouette (Left) ── */}
+      {/* Head */}
+      <circle cx="17.5" cy="16.5" r="4.2" fill="url(#silhouetteGrad)" />
+      {/* Shoulders */}
+      <path
+        d="M10 30 C10 24.5 13.5 22 17.5 22 C21 22 23.5 24 24.2 28.5"
+        stroke="url(#silhouetteGrad)"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        fill="none"
+      />
+
+      {/* ── Sweeping cyan/teal arrow piercing the ring (Right) ── */}
+      {/* Curved shaft */}
+      <path
+        d="M13.5 32.5 C16.5 29 23 23 31.5 13.5"
+        stroke="url(#arrowGrad)"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        filter="url(#cyanGlow)"
+      />
+      {/* Arrowhead */}
+      <polygon
+        points="32.5,12 25.5,14 29,19"
+        fill="url(#arrowGrad)"
+        filter="url(#cyanGlow)"
+      />
+    </g>
+  </svg>
+);
+
+
+function App() {
+  // Authentication state
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    try {
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
+  
+  // Auth Form State
+  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [authName, setAuthName] = useState('');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+
+  // App Core State
+  const [activeView, setActiveView] = useState('generator'); // 'generator' | 'results'
+  const [profileText, setProfileText] = useState('');
+  const [jobDescription, setJobDescription] = useState('');
+  const [resumeText, setResumeText] = useState('');
+  const [tailoringNotes, setTailoringNotes] = useState([]);
+  const [atsResult, setAtsResult] = useState({
+    score: null,
+    matched: [],
+    missing: [],
+    verdict: ''
+  });
+  
+  // Saved resumes state
+  const [savedResumes, setSavedResumes] = useState([]);
+  const [selectedResumeId, setSelectedResumeId] = useState(null);
+  const [saveTitle, setSaveTitle] = useState('');
+  const resumeRef = useRef(null);
+
+  // Status/Loading States
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [isAtsChecking, setIsAtsChecking] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isListLoading, setIsListLoading] = useState(false);
+  
+  // Feedback States
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Clear messages after a delay
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(''), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
+
+  // Load Saved Resumes list on login
+  useEffect(() => {
+    if (token) {
+      fetchResumes();
+    }
+  }, [token]);
+
+  // Helper for authenticated API headers
+  const getAuthHeaders = (extraHeaders = {}) => {
+    return {
+      'Authorization': `Bearer ${token}`,
+      ...extraHeaders
+    };
+  };
+
+  // Centralized API response handler for 401s
+  const handleApiResponse = async (response) => {
+    if (response.status === 401) {
+      // Clear credentials
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setToken('');
+      setUser(null);
+      setSavedResumes([]);
+      setError('Your session has expired. Please log in again.');
+      throw new Error('Unauthorized');
+    }
+    
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Request failed. Please try again.');
+    }
+    return data;
+  };
+
+  // Auth Operations
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    const url = isLoginMode ? '/api/auth/login' : '/api/auth/register';
+    const payload = isLoginMode 
+      ? { email: authEmail, password: authPassword }
+      : { name: authName, email: authEmail, password: authPassword };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Authentication failed.');
+      }
+
+      if (isLoginMode) {
+        // Store in state & localStorage
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setToken(data.token);
+        setUser(data.user);
+        
+        // Reset fields
+        setAuthName('');
+        setAuthEmail('');
+        setAuthPassword('');
+        setSuccess(`Welcome back, ${data.user.name}!`);
+      } else {
+        // Registration mode: redirect to login form instead of automatic login
+        setIsLoginMode(true);
+        setAuthName('');
+        setAuthPassword('');
+        setSuccess('Registration successful! Please sign in with your credentials.');
+      }
+    } catch (err) {
+      setError(err.message || 'An error occurred during authentication.');
+    }
+  };
+
+  const handleGoogleCredentialResponse = async (response) => {
+    setError('');
+    setSuccess('');
+    const idToken = response.credential;
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Google authentication failed.');
+      }
+      
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setToken(data.token);
+      setUser(data.user);
+      setSuccess(`Welcome, ${data.user.name}!`);
+    } catch (err) {
+      setError(err.message || 'An error occurred during Google sign in.');
+    }
+  };
+
+  useEffect(() => {
+    if (token) return;
+    
+    let interval;
+    const initGoogle = () => {
+      if (window.google) {
+        clearInterval(interval);
+        console.log('Google Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
+        window.google.accounts.id.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '1084282747127-dummyclientid.apps.googleusercontent.com',
+          callback: handleGoogleCredentialResponse,
+        });
+
+        const btnEl = document.getElementById('google-signin-btn');
+        if (btnEl) {
+          window.google.accounts.id.renderButton(btnEl, {
+            theme: 'outline',
+            size: 'large',
+            width: 360,
+          });
+        }
+      }
+    };
+
+    interval = setInterval(initGoogle, 300);
+    initGoogle();
+
+    return () => clearInterval(interval);
+  }, [token, isLoginMode]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setToken('');
+    setUser(null);
+    setSavedResumes([]);
+    setProfileText('');
+    setJobDescription('');
+    setResumeText('');
+    setTailoringNotes([]);
+    setAtsResult({ score: null, matched: [], missing: [], verdict: '' });
+    setActiveView('generator');
+    setSuccess('Logged out successfully.');
+  };
+
+  const handleGoHome = () => {
+    setActiveView('generator');
+    setSelectedResumeId(null);
+    setProfileText('');
+    setJobDescription('');
+    setResumeText('');
+    setTailoringNotes([]);
+    setAtsResult({ score: null, matched: [], missing: [], verdict: '' });
+    setSaveTitle('');
+    setError('');
+    setSuccess('');
+  };
+
+  // Fetch all saved resumes for the user
+  const fetchResumes = async () => {
+    setIsListLoading(true);
+    try {
+      const response = await fetch('/api/resume', {
+        headers: getAuthHeaders()
+      });
+      const data = await handleApiResponse(response);
+      setSavedResumes(data);
+    } catch (err) {
+      if (err.message !== 'Unauthorized') {
+        setError('Could not load your saved resumes.');
+      }
+    } finally {
+      setIsListLoading(false);
+    }
+  };
+
+  // Load a single resume
+  const handleLoadResume = async (id) => {
+    setError('');
+    setSuccess('');
+    try {
+      const response = await fetch(`/api/resume/${id}`, {
+        headers: getAuthHeaders()
+      });
+      const data = await handleApiResponse(response);
+      
+      setProfileText(data.profile || '');
+      setJobDescription(data.jobDescription || '');
+      setResumeText(data.resumeText || '');
+      setSelectedResumeId(data._id);
+      
+      // Preset ATS score preview from saved data
+      setAtsResult({
+        score: data.atsScore,
+        matched: [],
+        missing: [],
+        verdict: `Saved Score: ${data.atsScore}%. Click "Check ATS Readiness" below to run a keyword assessment.`
+      });
+      setTailoringNotes([]);
+      setActiveView('results');
+      setSuccess(`Loaded resume: "${data.title}"`);
+    } catch (err) {
+      if (err.message !== 'Unauthorized') {
+        setError('Failed to load the selected resume.');
+      }
+    }
+  };
+
+  // Delete a saved resume
+  const handleDeleteResume = async (id, title, e) => {
+    e.stopPropagation(); // Prevent loading the resume when clicking the delete button
+    
+    const confirmDelete = window.confirm(`Are you sure you want to delete the saved resume "${title}"?`);
+    if (!confirmDelete) return;
+
+    setError('');
+    setSuccess('');
+    try {
+      const response = await fetch(`/api/resume/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      await handleApiResponse(response);
+
+      setSuccess(`Resume "${title}" deleted successfully.`);
+      
+      // If the deleted resume is currently loaded, reset the workspace
+      if (selectedResumeId === id) {
+        handleGoHome();
+      }
+      
+      // Refresh list
+      fetchResumes();
+    } catch (err) {
+      if (err.message !== 'Unauthorized') {
+        setError('Failed to delete the selected resume.');
+      }
+    }
+  };
+
+  // File Text Extraction Handler
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setError('');
+    setIsExtracting(true);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/profile/extract', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: formData
+      });
+      const data = await handleApiResponse(response);
+      
+      setProfileText(data.text);
+      setSuccess('Successfully extracted text from document!');
+    } catch (err) {
+      if (err.message !== 'Unauthorized') {
+        setError(err.message || 'Failed to extract text from the file.');
+      }
+    } finally {
+      setIsExtracting(false);
+      // Reset input value so same file can be uploaded again
+      e.target.value = '';
+    }
+  };
+
+  // Resume Tailoring Call
+  const handleGenerateResume = async () => {
+    if (!profileText || !jobDescription) return;
+    
+    setError('');
+    setSuccess('');
+    setIsGenerating(true);
+    setGenerationProgress(0);
+    setResumeText('');
+    setTailoringNotes([]);
+    setAtsResult({ score: null, matched: [], missing: [], verdict: '' });
+    setActiveView('results');
+
+    let progressVal = 0;
+    const progressInterval = setInterval(() => {
+      progressVal = Math.min(
+        98,
+        progressVal + (progressVal < 30 ? 4 : progressVal < 70 ? 2 : 1)
+      );
+      setGenerationProgress(progressVal);
+    }, 120);
+
+    try {
+      const response = await fetch('/api/resume/generate', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          profile: profileText,
+          jobDescription: jobDescription
+        })
+      });
+      const data = await handleApiResponse(response);
+
+      clearInterval(progressInterval);
+      setGenerationProgress(100);
+      await new Promise(resolve => setTimeout(resolve, 350));
+
+      setResumeText(data.resumeText);
+      setTailoringNotes(data.tailoringNotes || []);
+      setSuccess('Resume tailored successfully!');
+    } catch (err) {
+      clearInterval(progressInterval);
+      setGenerationProgress(0);
+      if (err.message !== 'Unauthorized') {
+        setError(err.message || 'An error occurred during resume tailoring.');
+      }
+      setActiveView('generator');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Deterministic Keyword ATS Checker Call
+  const handleAtsCheck = async () => {
+    if (!resumeText || !jobDescription) return;
+
+    const forbidden = getManualSkillsAdded(resumeText, atsResult.missingSkills);
+    if (forbidden.length > 0) {
+      setError(`Cannot check ATS readiness. Please remove the manually added skill gaps: ${forbidden.join(', ')}`);
+      return;
+    }
+
+    setError('');
+    setIsAtsChecking(true);
+
+    try {
+      const response = await fetch('/api/ats/check', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          resumeText: resumeText,
+          jobDescription: jobDescription
+        })
+      });
+      const data = await handleApiResponse(response);
+
+      const mSkills = data.missingSkills || [];
+      const mGeneric = data.missingGeneric || (data.missing || []).filter((k) => !mSkills.includes(k));
+      setAtsResult({
+        score: data.score,
+        matched: data.matched,
+        missing: data.missing,
+        missingSkills: mSkills,
+        missingGeneric: mGeneric,
+        verdict: data.verdict
+      });
+      setSuccess('ATS analysis complete!');
+    } catch (err) {
+      if (err.message !== 'Unauthorized') {
+        setError(err.message || 'Failed to check ATS keywords.');
+      }
+    } finally {
+      setIsAtsChecking(false);
+    }
+  };
+
+  // Save Resume handler
+  const handleSaveResume = async () => {
+    if (!resumeText) return;
+
+    const forbidden = getManualSkillsAdded(resumeText, atsResult.missingSkills);
+    if (forbidden.length > 0) {
+      setError(`Cannot save resume. Please remove the manually added skill gaps: ${forbidden.join(', ')}`);
+      return;
+    }
+
+    const finalTitle = saveTitle.trim() || 'Tailored Resume';
+    
+    setError('');
+    setIsSaving(true);
+
+    try {
+      // If the user hasn't run an ATS check yet, run it now so the saved score is real (not 0)
+      let scoreToSave = atsResult.score;
+      if (scoreToSave === null && jobDescription) {
+        try {
+          const atsRes = await fetch('/api/ats/check', {
+            method: 'POST',
+            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ resumeText, jobDescription })
+          });
+          const atsData = await handleApiResponse(atsRes);
+          scoreToSave = atsData.score;
+          setAtsResult({
+            score: atsData.score,
+            matched: atsData.matched,
+            missing: atsData.missing,
+            missingSkills: atsData.missingSkills || [],
+            missingGeneric: atsData.missingGeneric || [],
+            verdict: atsData.verdict
+          });
+        } catch (atsErr) {
+          if (atsErr.message === 'Unauthorized') throw atsErr;
+          scoreToSave = 0;
+        }
+      }
+
+      const response = await fetch('/api/resume', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          title: finalTitle,
+          profile: profileText,
+          jobDescription: jobDescription,
+          resumeText: resumeText,
+          atsScore: scoreToSave !== null ? scoreToSave : 0
+        })
+      });
+      const data = await handleApiResponse(response);
+
+      setSelectedResumeId(data._id);
+      setSuccess(`Resume "${finalTitle}" saved successfully!`);
+      setSaveTitle('');
+      fetchResumes(); // refresh sidebar list
+    } catch (err) {
+      if (err.message !== 'Unauthorized') {
+        setError(err.message || 'Failed to save resume.');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Insert a generic (safe) keyword into the resume at the cursor position
+  const insertKeyword = (word) => {
+    const el = resumeRef.current;
+    const text = resumeText;
+    let pos = text.length;
+    if (el && typeof el.selectionStart === 'number') {
+      pos = el.selectionStart;
+    }
+    const before = text.slice(0, pos);
+    const after = text.slice(pos);
+    const sep = before && !/\s$/.test(before) ? ' ' : '';
+    const insertion = sep + word;
+    setResumeText(before + insertion + after);
+    setSuccess(`Added "${word}" to your resume — reposition it as needed.`);
+    setTimeout(() => {
+      if (el) {
+        el.focus();
+        const c = (before + insertion).length;
+        el.setSelectionRange(c, c);
+      }
+    }, 50);
+  };
+
+  // Export to PDF (Triggers print media stylesheets)
+  const handleExportPdf = () => {
+    if (!resumeText) return;
+    setError('');
+    setSuccess('Opening your print dialog — choose "Save as PDF" as the destination to export.');
+    setTimeout(() => window.print(), 150);
+  };
+
+  // Helper score range color class
+  const getScoreColorClass = (score) => {
+    if (score === null) return '';
+    if (score < 50) return 'low';
+    if (score < 80) return 'medium';
+    return '';
+  };
+
+  // RENDER AUTH PAGE IF NOT LOGGED IN
+  if (!token) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <div className="auth-header">
+            <div className="auth-logo">
+              <RoleFitLogo size={52} />
+            </div>
+            <h1 className="auth-title">RoleFit <span>AI</span></h1>
+            <p className="auth-subtitle">
+              {isLoginMode 
+                ? 'Sign in to access your tailored resumes' 
+                : 'Create an account to start tailoring resumes'}
+            </p>
+          </div>
+
+          {error && (
+            <div className="error-banner">
+              <span>⚠️</span> {error}
+            </div>
+          )}
+          {success && (
+            <div className="success-banner">
+              {success}
+            </div>
+          )}
+
+          <form onSubmit={handleAuthSubmit}>
+            {!isLoginMode && (
+              <div className="form-group">
+                <label className="form-label">Full Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="John Doe"
+                  value={authName}
+                  onChange={(e) => setAuthName(e.target.value)}
+                  required={!isLoginMode}
+                />
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label">Email Address</label>
+              <input
+                type="email"
+                className="form-control"
+                placeholder="name@domain.com"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Password</label>
+              <input
+                type="password"
+                className="form-control"
+                placeholder="••••••••"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                required
+              />
+            </div>
+
+            <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>
+              {isLoginMode ? 'Sign In' : 'Create Account'}
+            </button>
+          </form>
+
+          <div className="auth-divider" style={{ display: 'flex', alignItems: 'center', margin: '1.5rem 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
+            <span style={{ padding: '0 0.75rem' }}>or</span>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+            <div id="google-signin-btn" style={{ width: '100%' }}></div>
+          </div>
+
+          <p className="auth-toggle-text">
+            {isLoginMode ? "Don't have an account yet?" : "Already have an account?"}
+            <button 
+              type="button" 
+              className="auth-link" 
+              onClick={() => {
+                setIsLoginMode(!isLoginMode);
+                setError('');
+                setSuccess('');
+              }}
+            >
+              {isLoginMode ? 'Register' : 'Log In'}
+            </button>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // RENDER APP MAIN PAGE IF LOGGED IN
+  return (
+    <>
+      {/* Printable Area - Hidden on Screen, visible only in @media print */}
+      <div className="printable-resume">
+        <div className="printable-resume-content">{renderResume(resumeText)}</div>
+      </div>
+
+      {/* Screen Interface Wrapper */}
+      <div className="app-container no-print">
+        <header className="app-header">
+          <div className="logo-container" onClick={handleGoHome} title="Return to Home / New Resume">
+            <RoleFitLogo size={36} />
+            <div className="logo-text">RoleFit <span>AI</span></div>
+          </div>
+
+          <div className="user-nav">
+            <div className="user-info">
+              Logged in as: <span className="user-name">{user?.name}</span>
+            </div>
+            <button onClick={handleLogout} className="btn btn-secondary" style={{ width: 'auto', padding: '0.5rem 1rem' }}>
+              Log Out
+            </button>
+          </div>
+        </header>
+
+        {error && (
+          <div className="error-banner" style={{ margin: '1.25rem 2rem 0' }}>
+            <span>⚠️</span> {error}
+          </div>
+        )}
+        {success && (
+          <div className="success-banner" style={{ margin: '1.25rem 2rem 0' }}>
+            ✅ {success}
+          </div>
+        )}
+
+        <main className="main-layout">
+          {/* LEFT SIDEBAR: SAVED RESUMES */}
+          <aside className="sidebar">
+            <div className="card">
+              <h2 className="card-title">
+                My Saved Resumes
+                {isListLoading && <span style={{ fontSize: '0.78rem', color: 'var(--mint)', fontWeight: 500 }}>Loading…</span>}
+              </h2>
+
+              <div className="resume-list">
+                {savedResumes.length === 0 ? (
+                  <div className="empty-state">
+                    {isListLoading ? 'Retrieving records…' : 'No resumes saved yet.\nGenerate one to get started!'}
+                  </div>
+                ) : (
+                  savedResumes.map((resume) => (
+                    <button
+                      key={resume._id}
+                      onClick={() => handleLoadResume(resume._id)}
+                      className={`resume-item ${selectedResumeId === resume._id ? 'active' : ''}`}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                        <div className="resume-item-title" style={{ flex: 1, textAlign: 'left', margin: 0 }}>{resume.title}</div>
+                        <span 
+                          className="resume-item-delete"
+                          onClick={(e) => handleDeleteResume(resume._id, resume.title, e)}
+                          title="Delete saved resume"
+                        >
+                          🗑️
+                        </span>
+                      </div>
+                      <div className="resume-item-meta">
+                        <span>
+                          {new Date(resume.updatedAt).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </span>
+                        <span className={`score-badge ${getScoreColorClass(resume.atsScore)}`}>
+                          ATS: {resume.atsScore}%
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </aside>
+
+          {/* RIGHT WORKSPACE */}
+          <section className="workspace">
+
+            {/* ═══════════════════════════════════════
+                GENERATOR VIEW
+                ═══════════════════════════════════════ */}
+            {activeView === 'generator' ? (
+              <>
+                {/* File Upload */}
+                <div className="card">
+                  <h3 className="card-title" style={{ fontSize: '0.95rem', marginBottom: '0.65rem' }}>
+                    Upload an existing resume — optional
+                  </h3>
+                  <div className={`file-upload-wrapper ${isExtracting ? 'uploading' : ''}`}>
+                    <input
+                      type="file"
+                      className="file-upload-input"
+                      accept=".pdf,.docx,.txt"
+                      onChange={handleFileUpload}
+                      disabled={isExtracting}
+                    />
+                    <div className="file-upload-text">
+                      {isExtracting ? (
+                        <strong>Extracting text from your file… Please wait.</strong>
+                      ) : (
+                        <>Drag and drop or <strong>click to upload</strong> (.pdf, .docx, .txt · max 5 MB)</>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Two-column Editors */}
+                <div className="two-col-editor">
+                  {/* Profile */}
+                  <div className="card">
+                    <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.88rem' }}>
+                      Your Profile / Experience
+                    </label>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+                      Work history, skills, achievements, and education.
+                    </p>
+                    <textarea
+                      className="form-control"
+                      style={{ minHeight: '300px' }}
+                      placeholder="Paste your existing resume raw text, or describe your work experience (company, role, responsibilities), key skills, and credentials…"
+                      value={profileText}
+                      onChange={(e) => setProfileText(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Job Description */}
+                  <div className="card">
+                    <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.88rem' }}>
+                      Target Job Description
+                    </label>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+                      Paste the full job description of the position you are applying for.
+                    </p>
+                    <textarea
+                      className="form-control"
+                      style={{ minHeight: '300px' }}
+                      placeholder="Paste the complete responsibilities, qualifications, and requirements from the job description here…"
+                      value={jobDescription}
+                      onChange={(e) => setJobDescription(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Generate Button */}
+                <div className="generate-btn-wrap">
+                  <button
+                    onClick={handleGenerateResume}
+                    disabled={isGenerating || !profileText.trim() || !jobDescription.trim()}
+                    className="btn btn-primary"
+                  >
+                    {isGenerating ? 'Tailoring with Gemini AI…' : '✦ Generate Tailored Resume'}
+                  </button>
+                </div>
+              </>
+
+            ) : (
+              /* ═══════════════════════════════════════
+                 RESULTS VIEW
+                 ═══════════════════════════════════════ */
+              <>
+                {/* Back Row */}
+                <div className="back-btn-row">
+                  <button
+                    onClick={() => setActiveView('generator')}
+                    disabled={isGenerating}
+                    className="btn btn-secondary"
+                  >
+                    ← Edit Inputs
+                  </button>
+                  {!isGenerating && resumeText && (
+                    <span className="view-label">✦ Your tailored resume is ready</span>
+                  )}
+                </div>
+
+                {/* ── LOADING STATE ── */}
+                {isGenerating ? (
+                  <div className="card" style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    justifyContent: 'center', padding: '3.5rem 2rem', gap: '2rem',
+                    minHeight: '420px'
+                  }}>
+                    <style>{`
+                      @keyframes spin-slow {
+                        0%   { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                      }
+                      @keyframes pulse-slow {
+                        0%, 100% { opacity: 0.6; }
+                        50%       { opacity: 1; }
+                      }
+                    `}</style>
+
+                    {/* Circular Progress */}
+                    <div style={{ position: 'relative', width: '140px', height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ position: 'absolute', width: '110px', height: '110px', borderRadius: '50%', background: 'rgba(0,212,168,0.07)', filter: 'blur(16px)', zIndex: 0 }}></div>
+                      <svg width="130" height="130" viewBox="0 0 120 120" style={{ transform: 'rotate(-90deg)', zIndex: 1 }}>
+                        <circle cx="60" cy="60" r="50" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+                        <circle cx="60" cy="60" r="54" fill="transparent" stroke="var(--navy-light)" strokeWidth="1.5" strokeDasharray="5, 15"
+                          style={{ animation: 'spin-slow 8s linear infinite', transformOrigin: 'center' }} />
+                        <circle cx="60" cy="60" r="50" fill="transparent" stroke="var(--mint)" strokeWidth="8"
+                          strokeDasharray="314" strokeDashoffset={314 - (314 * generationProgress) / 100}
+                          strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.3s ease-out' }} />
+                      </svg>
+                      <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
+                        <span style={{ fontFamily: 'var(--font-title)', fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                          {generationProgress}%
+                        </span>
+                        <span style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--mint)', fontWeight: 600 }}>
+                          Progress
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Status */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', textAlign: 'center' }}>
+                      <h4 style={{ fontFamily: 'var(--font-title)', fontSize: '1.2rem', fontWeight: 600, color: 'var(--text-primary)', animation: 'pulse-slow 2s infinite ease-in-out' }}>
+                        {getProgressStatusMessage(generationProgress)}
+                      </h4>
+                      <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', maxWidth: '340px' }}>
+                        Aligning your work history with the target job requirements via Gemini AI.
+                      </p>
+                    </div>
+
+                    {/* Skeleton Shimmer */}
+                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem', opacity: 0.12, pointerEvents: 'none', marginTop: '0.5rem' }}>
+                      <div style={{ height: '14px', background: 'var(--text-secondary)', borderRadius: '4px', width: '22%' }}></div>
+                      <div style={{ height: '56px', background: 'var(--text-secondary)', borderRadius: '6px' }}></div>
+                      <div style={{ height: '14px', background: 'var(--text-secondary)', borderRadius: '4px', width: '14%' }}></div>
+                      <div style={{ height: '110px', background: 'var(--text-secondary)', borderRadius: '6px' }}></div>
+                    </div>
+                  </div>
+
+                ) : resumeText && (
+                  /* ── TWO-COLUMN RESULTS WORKSPACE ── */
+                  <div className="results-workspace">
+
+                    {/* ── LEFT COLUMN: Editor + Actions + ATS ── */}
+                    <div className="results-left">
+
+                      {/* Editable Resume */}
+                      <div className="card output-card">
+                        <div className="card-title">
+                          <span>Tailored Resume</span>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>
+                            Proofread &amp; edit below
+                          </span>
+                        </div>
+
+                        <textarea
+                          ref={resumeRef}
+                          className="form-control resume-textarea"
+                          value={resumeText}
+                          onChange={(e) => setResumeText(e.target.value)}
+                          placeholder="Your tailored resume text will appear here. Edit it directly."
+                        />
+
+                        {getManualSkillsAdded(resumeText, atsResult.missingSkills).length > 0 && (
+                          <div className="error-banner" style={{ marginTop: '0.6rem', marginBottom: 0 }}>
+                            <span>⚠️</span>
+                            <div>
+                              <strong>Skill Gap Warning:</strong> You have manually inserted a skill you haven't acquired yet:{' '}
+                              <strong>{getManualSkillsAdded(resumeText, atsResult.missingSkills).join(', ')}</strong>.
+                              Please remove it to save or check readiness.
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Save Title */}
+                        <div className="save-row">
+                          <label className="save-row-label" htmlFor="resume-title">
+                            Resume title — labels this in "My Saved Resumes" (optional)
+                          </label>
+                          <input
+                            id="resume-title"
+                            type="text"
+                            className="form-control"
+                            placeholder="e.g. Data Analyst — Acme Corp"
+                            value={saveTitle}
+                            onChange={(e) => setSaveTitle(e.target.value)}
+                          />
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="editor-actions">
+                          <button
+                            onClick={handleAtsCheck}
+                            disabled={isAtsChecking || getManualSkillsAdded(resumeText, atsResult.missingSkills).length > 0}
+                            className="btn btn-secondary"
+                          >
+                            {isAtsChecking ? 'Analyzing…' : '🔍 Check ATS'}
+                          </button>
+                          <button
+                            onClick={handleSaveResume}
+                            disabled={isSaving || getManualSkillsAdded(resumeText, atsResult.missingSkills).length > 0}
+                            className="btn btn-secondary"
+                          >
+                            {isSaving ? 'Saving…' : '💾 Save Resume'}
+                          </button>
+                          <button
+                            onClick={handleExportPdf}
+                            className="btn btn-primary"
+                          >
+                            📄 Export PDF
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* ATS Dashboard */}
+                      {atsResult.score !== null && (
+                        <div className="ats-dashboard">
+                          <div className="ats-summary">
+                            <div className={`ats-score-circle ${getScoreColorClass(atsResult.score)}`}>
+                              {atsResult.score}%
+                            </div>
+                            <div className="ats-verdict-box">
+                              <div className="ats-verdict-title" style={{ color: atsResult.score >= 80 ? 'var(--mint)' : atsResult.score >= 50 ? '#F59E0B' : '#EF4444' }}>
+                                ATS Keyword Optimization
+                              </div>
+                              <div className="ats-verdict-desc">{atsResult.verdict}</div>
+                            </div>
+                          </div>
+
+                          {/* Legend */}
+                          <div className="kw-legend">
+                            <span><span className="dot dot-matched"></span> Matched</span>
+                            <span><span className="dot dot-generic"></span> Safe to add — click to insert</span>
+                            <span><span className="dot dot-skill"></span> Skill gap — hover for courses</span>
+                          </div>
+
+                          <div className="kw-grid">
+                            {/* Matched */}
+                            <div className="keyword-chips-section">
+                              <div className="keyword-category-title">Matched ({atsResult.matched.length})</div>
+                              <div className="chips-container">
+                                {atsResult.matched.length === 0 ? (
+                                  <span className="kw-empty">None matched yet</span>
+                                ) : atsResult.matched.map((kw, i) => (
+                                  <span key={i} className="chip chip-matched">{kw}</span>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Generic — click to add */}
+                            <div className="keyword-chips-section">
+                              <div className="keyword-category-title">
+                                Safe to add ({(atsResult.missingGeneric || []).length})
+                              </div>
+                              <div className="chips-container">
+                                {(atsResult.missingGeneric || []).length === 0 ? (
+                                  <span className="kw-empty">None</span>
+                                ) : (atsResult.missingGeneric || []).map((kw, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    className="chip chip-generic chip-add"
+                                    title={`Click to add "${kw}" at cursor position`}
+                                    onClick={() => insertKeyword(kw)}
+                                  >
+                                    {kw}<span className="chip-plus">+</span>
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="kw-hint">
+                                💡 Click inside the editor to place your cursor first, then click a word to insert it there.
+                              </div>
+                            </div>
+
+                            {/* Skill Gap — hover for courses */}
+                            <div className="keyword-chips-section">
+                              <div className="keyword-category-title">
+                                Skill gaps — learn these ({(atsResult.missingSkills || []).length})
+                              </div>
+                              <div className="chips-container">
+                                {(atsResult.missingSkills || []).length === 0 ? (
+                                  <span className="kw-empty">No skill gaps 🎉</span>
+                                ) : (atsResult.missingSkills || []).map((kw, i) => (
+                                  <span key={i} className="skill-chip-wrap">
+                                    <span className="chip chip-skill" title="A real skill — hover for courses">{kw}</span>
+                                    <span className="skill-tooltip">
+                                      <span className="skill-tooltip-title">Learn "{kw}"</span>
+                                      <a href={courseLink('coursera', kw)} target="_blank" rel="noreferrer">Coursera</a>
+                                      <a href={courseLink('udemy', kw)} target="_blank" rel="noreferrer">Udemy</a>
+                                      <a href={courseLink('web', kw)} target="_blank" rel="noreferrer">Web search</a>
+                                    </span>
+                                  </span>
+                                ))}
+                              </div>
+                              <div className="kw-hint">🔒 Real skills — can't be added, only earned. Hover for course suggestions.</div>
+                            </div>
+                          </div>
+
+                          {atsResult.score < 80 && ((atsResult.missingGeneric || []).length > 0 || (atsResult.missingSkills || []).length > 0) && (
+                            <div className="ats-tips">
+                              <div className="ats-tips-title">How to raise your score</div>
+                              <ol>
+                                <li>Place your cursor in the editor, then click the amber terms to insert relevant ones.</li>
+                                <li>For pink skills, take a suggested course, then add the skill and re-check.</li>
+                                <li>Paste the full job description — a one-line JD yields very few keywords.</li>
+                              </ol>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── RIGHT COLUMN: Sticky Preview + Tailoring Notes ── */}
+                    <div className="results-right">
+
+                      {/* Formatted Preview Panel */}
+                      <div className="preview-panel">
+                        <div className="preview-panel-label">
+                          <span>◈</span> Live PDF Preview
+                        </div>
+                        <div className="resume-preview">{renderResume(resumeText)}</div>
+                      </div>
+
+                      {/* Tailoring Notes */}
+                      {tailoringNotes.length > 0 && (
+                        <div className="card">
+                          <div className="notes-title">Tailoring Adjustments (Gemini Focus)</div>
+                          <ul className="notes-list">
+                            {tailoringNotes.map((note, index) => (
+                              <li key={index}>{note}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </main>
+      </div>
+    </>
+  );
+}
+
+export default App;
