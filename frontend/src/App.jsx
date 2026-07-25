@@ -405,10 +405,13 @@ function App() {
 
         const btnEl = document.getElementById('google-signin-btn');
         if (btnEl) {
+          btnEl.innerHTML = '';
+          const computedWidth = btnEl.offsetWidth ? Math.min(btnEl.offsetWidth, 360) : 320;
           window.google.accounts.id.renderButton(btnEl, {
             theme: 'outline',
             size: 'large',
-            width: 360,
+            width: Math.max(computedWidth, 240),
+            shape: 'rectangular',
           });
         }
       }

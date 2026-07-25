@@ -897,3 +897,21 @@ textarea.form-control { resize: vertical; min-height: 120px; line-height: 1.55; 
   .printable-resume-content li { margin: 0 0 3pt 0 !important; }
   .printable-resume-content strong { font-weight: bold !important; }
 }
+
+/* ======================================================
+   GOOGLE SIGN-IN RESPONSIVE BUTTON
+   ====================================================== */
+#google-signin-btn {
+  width: 100%;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+#google-signin-btn > div,
+#google-signin-btn iframe {
+  max-width: 100% !important;
+  border-radius: var(--radius-sm) !important;
+}
