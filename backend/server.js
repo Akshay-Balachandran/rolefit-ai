@@ -56,7 +56,13 @@ app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'Endpoint not found.' });
 });
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`RoleFit AI Server running on port ${PORT}`);
-});
+// Export app for Vercel Serverless
+export default app;
+
+// Start Server (only when not running in Vercel serverless environment)
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`RoleFit AI Server running on port ${PORT}`);
+  });
+}
+
