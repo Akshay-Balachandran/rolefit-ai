@@ -899,19 +899,102 @@ textarea.form-control { resize: vertical; min-height: 120px; line-height: 1.55; 
 }
 
 /* ======================================================
-   GOOGLE SIGN-IN RESPONSIVE BUTTON
+   GOOGLE SIGN-IN CUSTOM OVERLAY BUTTON
    ====================================================== */
-#google-signin-btn {
+.google-btn-wrapper {
+  position: relative;
   width: 100%;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  overflow: hidden;
-  border-radius: var(--radius-sm);
+  margin-bottom: 1.25rem;
 }
 
-#google-signin-btn > div,
-#google-signin-btn iframe {
-  max-width: 100% !important;
-  border-radius: var(--radius-sm) !important;
+.btn-google-custom {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-google-custom:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.google-signin-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.001;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  z-index: 5;
+}
+
+.google-signin-overlay iframe {
+  width: 100% !important;
+  height: 100% !important;
+  transform: scale(2);
+  cursor: pointer;
+}
+
+.header-logout-btn {
+  width: auto;
+  padding: 0.5rem 1rem;
+  flex-shrink: 0;
+}
+
+/* ======================================================
+   RESPONSIVE HEADER FOR MOBILE (Fix Overlapping)
+   ====================================================== */
+@media (max-width: 640px) {
+  .app-header {
+    padding: 0.65rem 0.85rem;
+    gap: 0.5rem;
+  }
+
+  .logo-container {
+    gap: 0.4rem;
+    flex-shrink: 0;
+  }
+
+  .logo-text {
+    font-size: 1.1rem;
+  }
+
+  .user-nav {
+    gap: 0.5rem;
+    flex-shrink: 1;
+    min-width: 0;
+    justify-content: flex-end;
+  }
+
+  .user-info {
+    font-size: 0.78rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 110px;
+    text-align: right;
+  }
+
+  .user-info-label {
+    display: none;
+  }
+
+  .header-logout-btn {
+    padding: 0.38rem 0.65rem;
+    font-size: 0.78rem;
+  }
 }
