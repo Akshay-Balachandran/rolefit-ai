@@ -4,7 +4,7 @@ import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// A robust set of English stop words + common resume filler words to exclude
+// A comprehensive set of English stop words + job posting metadata / filler words to exclude
 export const STOP_WORDS = new Set([
   'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'arent', 'as', 'at',
   'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by', 'cant', 'cannot', 'could',
@@ -19,14 +19,45 @@ export const STOP_WORDS = new Set([
   'to', 'too', 'under', 'until', 'up', 'very', 'was', 'wasnt', 'we', 'wed', 'well', 'were', 'weve', 'werent',
   'what', 'whats', 'when', 'where', 'which', 'while', 'who', 'whom', 'why', 'with', 'wont', 'would', 'wouldnt',
   'you', 'youd', 'youll', 'youre', 'youve', 'your', 'yours', 'yourself', 'yourselves',
-  // Common job description / filler words
+  // Common job posting metadata & structural filler words
   'experience', 'skills', 'work', 'job', 'ability', 'role', 'team', 'years', 'candidate', 'position',
   'requirements', 'duties', 'responsibilities', 'qualified', 'successful', 'ideal', 'key', 'strong',
   'preferred', 'required', 'minimum', 'plus', 'join', 'company', 'looking', 'description', 'opportunity',
-  'support', 'build', 'develop', 'manage', 'help', 'design', 'lead', 'deliver', 'create', 'working'
+  'support', 'build', 'develop', 'manage', 'help', 'design', 'lead', 'deliver', 'create', 'working',
+  'title', 'location', 'hybrid', 'remote', 'full-time', 'part-time', 'seeking', 'ambitious', 'labs',
+  'inc', 'llc', 'corp', 'corporation', 'closely', 'drive', 'driving', 'solutions', 'overview', 'summary'
 ]);
 
-// Extracts the most frequent meaningful keywords from a job description.
+// Taxonomy of recognized technical skills, frameworks, tools, and methodologies
+export const SKILL_KEYWORDS = new Set([
+  'java', 'javascript', 'js', 'typescript', 'ts', 'python', 'csharp', 'golang', 'go', 'ruby',
+  'php', 'kotlin', 'swift', 'scala', 'rust', 'perl', 'matlab', 'sql', 'plsql', 'bash',
+  'powershell', 'html', 'css', 'sass', 'scss', 'xml', 'json', 'yaml',
+  'react', 'reactjs', 'angular', 'angularjs', 'vue', 'vuejs', 'svelte', 'node', 'nodejs',
+  'express', 'expressjs', 'nestjs', 'spring', 'springboot', 'boot', 'hibernate',
+  'django', 'flask', 'fastapi', 'laravel', 'rails', 'dotnet', 'asp', 'jquery',
+  'bootstrap', 'tailwind', 'redux', 'next', 'nextjs', 'nuxt', 'flutter',
+  'jest', 'mocha', 'cypress', 'selenium', 'junit', 'pytest', 'cucumber', 'playwright', 'postman',
+  'tensorflow', 'pytorch', 'keras', 'pandas', 'numpy', 'scipy', 'scikit', 'sklearn', 'opencv',
+  'nltk', 'spacy', 'ml', 'ai', 'nlp', 'llm', 'llms', 'large language models', 'generative ai', 'machine learning',
+  'tableau', 'powerbi', 'looker', 'statistics', 'statistical', 'etl', 'elt', 'spark', 'hadoop',
+  'kafka', 'airflow', 'databricks', 'snowflake', 'bigquery', 'dbt', 'analytics', 'product analytics',
+  'visualization', 'modeling', 'forecasting',
+  'aws', 'azure', 'gcp', 'cloud', 'docker', 'kubernetes', 'k8s', 'terraform',
+  'ansible', 'jenkins', 'gitlab', 'github', 'ci/cd', 'devops', 'sre', 'linux', 'unix', 'nginx',
+  'serverless', 'lambda', 'ec2', 's3', 'iam', 'prometheus', 'grafana', 'datadog', 'splunk',
+  'mysql', 'postgresql', 'postgres', 'mongodb', 'mongo', 'redis', 'oracle', 'dynamodb',
+  'elasticsearch', 'firebase', 'nosql', 'rdbms',
+  'rest', 'restful', 'api', 'apis', 'graphql', 'grpc', 'microservices', 'websocket',
+  'oauth', 'jwt', 'mvc', 'oop', 'vite', 'npm', 'yarn',
+  'agile', 'scrum', 'kanban', 'waterfall', 'jira', 'confluence', 'git', 'bitbucket',
+  'tdd', 'bdd', 'figma', 'sketch', 'wireframing', 'prototyping',
+  'cybersecurity', 'security', 'pentesting', 'automation', 'qa', 'sdet', 'salesforce',
+  'excel', 'powerpoint', 'vba', 'gtm', 'go-to-market', 'product strategy', 'roadmap',
+  'a/b testing', 'kpis', 'okrs', 'saas', 'b2b', 'user research', 'user stories', 'acceptance criteria'
+]);
+
+// Fallback frequency-based keyword extractor
 export const extractKeywords = (jobDescription, limit = 25) => {
   const jdClean = (jobDescription || '').toLowerCase().replace(/[^\w\s-]/g, ' ');
   const jdBits = jdClean.split(/\s+/);
@@ -43,41 +74,6 @@ export const extractKeywords = (jobDescription, limit = 25) => {
     .slice(0, limit);
 };
 
-// Curated skills taxonomy — tokens that represent a genuine, learnable skill
-export const SKILL_KEYWORDS = new Set([
-  'java', 'javascript', 'js', 'typescript', 'ts', 'python', 'csharp', 'golang', 'go', 'ruby',
-  'php', 'kotlin', 'swift', 'scala', 'rust', 'perl', 'matlab', 'sql', 'plsql', 'bash',
-  'powershell', 'html', 'css', 'sass', 'scss', 'xml', 'json', 'yaml',
-  'react', 'reactjs', 'angular', 'angularjs', 'vue', 'vuejs', 'svelte', 'node', 'nodejs',
-  'express', 'expressjs', 'nestjs', 'spring', 'springboot', 'boot', 'hibernate', 'struts',
-  'django', 'flask', 'fastapi', 'laravel', 'symfony', 'rails', 'dotnet', 'asp', 'jquery',
-  'bootstrap', 'tailwind', 'redux', 'next', 'nextjs', 'nuxt', 'flutter', 'xamarin', 'ionic',
-  'jest', 'mocha', 'chai', 'cypress', 'selenium', 'junit', 'testng', 'pytest', 'cucumber',
-  'playwright', 'jasmine', 'karma', 'postman',
-  'tensorflow', 'pytorch', 'keras', 'pandas', 'numpy', 'scipy', 'scikit', 'sklearn', 'opencv',
-  'nltk', 'spacy', 'ml', 'ai', 'nlp', 'llm', 'tableau', 'powerbi', 'looker', 'statistics',
-  'statistical', 'regression', 'classification', 'clustering', 'etl', 'elt', 'spark', 'hadoop',
-  'hive', 'kafka', 'airflow', 'databricks', 'snowflake', 'bigquery', 'dbt', 'analytics',
-  'visualization', 'modeling', 'forecasting',
-  'aws', 'azure', 'gcp', 'cloud', 'docker', 'kubernetes', 'k8s', 'openshift', 'terraform',
-  'ansible', 'puppet', 'chef', 'jenkins', 'gitlab', 'github', 'circleci', 'travis', 'ci', 'cd',
-  'cicd', 'devops', 'sre', 'linux', 'unix', 'nginx', 'apache', 'tomcat', 'serverless', 'lambda',
-  'ec2', 's3', 'iam', 'cloudformation', 'helm', 'prometheus', 'grafana', 'datadog', 'splunk',
-  'mysql', 'postgresql', 'postgres', 'mongodb', 'mongo', 'redis', 'oracle', 'sqlserver',
-  'sqlite', 'mariadb', 'cassandra', 'dynamodb', 'elasticsearch', 'firebase', 'couchbase',
-  'neo4j', 'nosql', 'rdbms',
-  'rest', 'restful', 'api', 'apis', 'graphql', 'grpc', 'soap', 'microservices', 'websocket',
-  'oauth', 'jwt', 'mvc', 'oop', 'soa', 'webpack', 'vite', 'babel', 'npm', 'yarn',
-  'agile', 'scrum', 'kanban', 'waterfall', 'jira', 'confluence', 'git', 'svn', 'bitbucket',
-  'tdd', 'bdd', 'ddd', 'uml', 'figma', 'sketch', 'photoshop', 'illustrator', 'invision',
-  'wireframing', 'prototyping',
-  'cybersecurity', 'security', 'pentesting', 'cryptography', 'networking', 'blockchain',
-  'solidity', 'iot', 'embedded', 'firmware', 'automation', 'rpa', 'qa', 'sdet', 'salesforce',
-  'sap', 'servicenow', 'dynamics', 'wordpress', 'shopify', 'magento', 'seo',
-  'excel', 'powerpoint', 'vba', 'macros', 'ssis', 'ssrs', 'informatica', 'talend', 'qlik',
-  'sas', 'spss',
-]);
-
 // POST /api/ats/check
 router.post('/check', authMiddleware, async (req, res) => {
   try {
@@ -87,58 +83,46 @@ router.post('/check', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Please provide both the resume text and the job description.' });
     }
 
-    // Extract the top keywords from the Job Description
-    const sortedKeywords = extractKeywords(jobDescription, 25);
-
-    if (sortedKeywords.length === 0) {
-      return res.json({
-        score: 0,
-        matched: [],
-        missing: [],
-        missingSkills: [],
-        missingGeneric: [],
-        verdict: 'The job description seems to contain no identifiable skills or keywords. Please add more details to the job description.',
-      });
-    }
-
     let matched = [];
-    let missing = [];
+    let missingSkills = [];
+    let missingGeneric = [];
+    let score = 0;
     let isSemantic = false;
 
-    // Try AI Semantic Keyword Matching via Gemini
+    // AI Semantic Keyword & Skill Extractor & Matcher via Gemini
     if (process.env.GEMINI_API_KEY) {
       try {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
         const model = genAI.getGenerativeModel({ model: modelName });
 
-        const prompt = `You are an ATS (Applicant Tracking System) keyword auditor.
-Analyze a candidate's resume against a list of key terms extracted from a job description.
+        const prompt = `You are an expert ATS (Applicant Tracking System) keyword and skills auditor.
+Given a Job Description and a Candidate's Resume, extract key skills and evaluate candidate alignment.
 
-Target Keywords from Job Description:
-${JSON.stringify(sortedKeywords)}
+Job Description:
+"""
+${jobDescription}
+"""
 
-Candidate Resume Text:
+Candidate Resume:
 """
 ${resumeText}
 """
 
 INSTRUCTIONS:
-1. For each keyword in the target list, evaluate if the resume demonstrates knowledge or experience in that skill.
-2. Use SEMANTIC MATCHING. Count synonyms, abbreviations, acronyms, or word stem variations as MATCHES.
-   Examples of valid semantic matches:
-   - "AWS" matches "Amazon Web Services" or "Amazon Cloud"
-   - "K8s" matches "Kubernetes"
-   - "React" matches "React.js" or "ReactJS"
-   - "JS" matches "JavaScript"
-   - "ML" matches "Machine Learning"
-   - "developing" matches "develop" or "developer"
-3. Categorize every single target keyword from the input list into either "matched" or "missing". Do not omit keywords or invent new ones.
+1. Extract 12 to 25 core skills, tools, domain competencies, and methodologies from the Job Description.
+   - Ignore company names (e.g. "InnovateAI Labs"), metadata ("Job Title", "Location", "Hybrid"), and generic English verbs ("drive", "closely", "help").
+   - Prefer meaningful technical/domain terms (e.g., "LLMs", "Machine Learning", "REST APIs", "Agile/Scrum", "Product Analytics", "GTM Strategy", "User Research", "B2B SaaS", "Roadmap").
+2. Evaluate each extracted skill against the candidate's resume:
+   - "matched": Skills/tools/competencies clearly demonstrated in the resume (using semantic synonyms e.g. "user interviews" matches "User Research", "REST APIs" matches "APIs", "APM/PM" matches "Product Management").
+   - "missingSkills": Real technical/hard skills, tools, frameworks, or domain methodologies required in the JD that are NOT present in the resume (e.g., "LLMs", "Machine Learning", "GTM Strategy").
+   - "missingGeneric": Business context or general domain terms in the JD missing from the resume.
 
 Return STRICT JSON format:
 {
-  "matched": ["keyword1", "keyword2"],
-  "missing": ["keyword3"]
+  "matched": ["Skill1", "Skill2"],
+  "missingSkills": ["Skill3", "Skill4"],
+  "missingGeneric": ["Term1"]
 }`;
 
         const result = await model.generateContent({
@@ -152,48 +136,57 @@ Return STRICT JSON format:
         
         if (start !== -1 && end !== -1) {
           const parsed = JSON.parse(responseText.slice(start, end + 1));
-          if (Array.isArray(parsed.matched) && Array.isArray(parsed.missing)) {
-            matched = parsed.matched;
-            missing = parsed.missing;
+          if (Array.isArray(parsed.matched) && (Array.isArray(parsed.missingSkills) || Array.isArray(parsed.missing))) {
+            matched = parsed.matched || [];
+            missingSkills = parsed.missingSkills || [];
+            missingGeneric = parsed.missingGeneric || parsed.missing || [];
             isSemantic = true;
+
+            const totalExtracted = matched.length + missingSkills.length + missingGeneric.length;
+            if (totalExtracted > 0) {
+              score = Math.round((matched.length / totalExtracted) * 100);
+            }
           }
         }
       } catch (aiErr) {
-        console.warn('Gemini semantic ATS check failed, falling back to deterministic string matching:', aiErr.message);
+        console.warn('Gemini semantic ATS check failed, falling back to deterministic matching:', aiErr.message);
       }
     }
 
-    // Fallback: Deterministic String Matching (if Gemini is unavailable or failed)
+    // Fallback: Deterministic String & Skill Taxonomy Matcher
     if (!isSemantic) {
+      const sortedKeywords = extractKeywords(jobDescription, 25);
       const resumeLower = resumeText.toLowerCase();
-      matched = [];
-      missing = [];
+      const rawMatched = [];
+      const rawMissing = [];
 
       for (const keyword of sortedKeywords) {
         if (resumeLower.includes(keyword)) {
-          matched.push(keyword);
+          rawMatched.push(keyword);
         } else {
-          missing.push(keyword);
+          rawMissing.push(keyword);
         }
       }
+
+      matched = rawMatched;
+      missingSkills = rawMissing.filter((k) => SKILL_KEYWORDS.has(k.toLowerCase()));
+      missingGeneric = rawMissing.filter((k) => !SKILL_KEYWORDS.has(k.toLowerCase()));
+      
+      const totalExtracted = matched.length + rawMissing.length;
+      score = totalExtracted > 0 ? Math.round((matched.length / totalExtracted) * 100) : 0;
     }
 
-    // Calculate ATS alignment score
-    const score = Math.round((matched.length / sortedKeywords.length) * 100);
+    const missing = [...missingSkills, ...missingGeneric];
 
     // Generate plain-English verdict
     let verdict = '';
     if (score >= 80) {
-      verdict = 'Excellent! Your resume is highly aligned with this job description (using semantic ATS verification). It contains a strong percentage of core keywords.';
+      verdict = 'Excellent alignment! Your resume strongly matches the core requirements and skills of this job description.';
     } else if (score >= 50) {
-      verdict = 'Good alignment, but can be improved. Consider editing your resume/profile to naturally integrate some of the missing keywords below.';
+      verdict = 'Moderate alignment. Your resume has good foundational matches, but is missing critical skills or domain terms listed below.';
     } else {
-      verdict = 'Weak alignment. Your resume is missing more than half of the critical keywords from this job description. We highly recommend modifying your profile and regenerating the resume.';
+      verdict = 'Low alignment. Your resume is missing several key technical skills and requirements for this role. We recommend tailoring your profile to include the missing skills.';
     }
-
-    // Split missing keywords: genuine skills vs generic terms
-    const missingSkills = missing.filter((k) => SKILL_KEYWORDS.has(k.toLowerCase()));
-    const missingGeneric = missing.filter((k) => !SKILL_KEYWORDS.has(k.toLowerCase()));
 
     return res.json({
       score,
