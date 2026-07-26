@@ -82,6 +82,8 @@ const getManualSkillsAdded = (text, missingSkills = []) => {
   if (!text) return [];
   const added = [];
   for (const skill of missingSkills) {
+    const cleanSkill = skill.toLowerCase().trim();
+    if (cleanSkill === 'ai' || cleanSkill === 'saas' || cleanSkill === 'b2b') continue;
     const regex = new RegExp(`\\b${escapeRegExp(skill)}\\b`, 'i');
     if (regex.test(text)) {
       added.push(skill);
@@ -621,12 +623,6 @@ function App() {
   // Deterministic Keyword ATS Checker Call
   const handleAtsCheck = async () => {
     if (!resumeText || !jobDescription) return;
-
-    const forbidden = getManualSkillsAdded(resumeText, atsResult.missingSkills);
-    if (forbidden.length > 0) {
-      setError(`Cannot check ATS readiness. Please remove the manually added skill gaps: ${forbidden.join(', ')}`);
-      return;
-    }
 
     setError('');
     setIsAtsChecking(true);
@@ -1176,7 +1172,7 @@ function App() {
                         <div className="editor-actions">
                           <button
                             onClick={handleAtsCheck}
-                            disabled={isAtsChecking || getManualSkillsAdded(resumeText, atsResult.missingSkills).length > 0}
+                            disabled={isAtsChecking}
                             className="btn btn-secondary"
                           >
                             {isAtsChecking ? 'Analyzing…' : '🔍 Check ATS'}
