@@ -74,6 +74,22 @@ export const extractKeywords = (jobDescription, limit = 25) => {
     .slice(0, limit);
 };
 
+// Helper: Verifies if a term or word boundary exists within the candidate's resume text
+const isTermInResume = (term, resumeText) => {
+  if (!term || !resumeText) return false;
+  const cleanTerm = term.toLowerCase().trim();
+  const resumeLower = resumeText.toLowerCase();
+
+  if (cleanTerm.length <= 3) {
+    // Word boundary check for short terms like "AI", "ML", "Git", "Jira", "AWS"
+    const escaped = cleanTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(?:^|[^a-zA-Z0-9])${escaped}(?:$|[^a-zA-Z0-9])`, 'i');
+    return regex.test(resumeText);
+  }
+
+  return resumeLower.includes(cleanTerm);
+};
+
 // POST /api/ats/check
 router.post('/check', authMiddleware, async (req, res) => {
   try {
@@ -110,11 +126,9 @@ ${resumeText}
 """
 
 INSTRUCTIONS:
-1. "matched": 10 to 18 key skills, tools, or domain terms from the JD that ARE ALREADY demonstrated in the candidate's resume (e.g. "Product Strategy", "User Research", "Mixpanel", "Product Analytics", "Roadmap").
-2. "missingGeneric" (SAFE TO ADD): 3 to 6 general domain terms, industry buzzwords, or soft methodologies present in the JD but missing from the resume that the candidate can safely click and insert into their resume text editor (e.g. "B2B SaaS", "AI", "Stakeholder Management", "Conversion & Retention Metrics", "Sprint Planning", "System Architecture").
-   - IMPORTANT: "AI" is a general domain term and MUST be placed in "missingGeneric", NOT in "missingSkills".
-   - MUST NOT be empty. Always extract 3 to 6 contextual safe-to-add terms.
-3. "missingSkills" (SKILL GAPS): 2 to 5 genuine, hard technical skills, heavy frameworks, or specialized technical concepts present in the JD but missing from the candidate's resume (e.g. "Large Language Models (LLMs)", "Machine Learning").
+1. "matched": Key skills, tools, or domain terms from the JD that ARE ALREADY present or clearly demonstrated in the candidate's resume (e.g. "Product Strategy", "User Research", "Mixpanel", "Product Analytics", "Roadmap").
+2. "missingGeneric" (SAFE TO ADD): General domain terms, industry buzzwords, or soft methodologies present in the JD but TRULY MISSING from the candidate's resume (e.g. "B2B SaaS", "Stakeholder Management", "Conversion & Retention Metrics", "Sprint Planning", "System Architecture").
+3. "missingSkills" (SKILL GAPS): Genuine, hard technical skills, heavy frameworks, or specialized technical concepts present in the JD but TRULY MISSING from the candidate's resume (e.g. "Large Language Models (LLMs)", "Machine Learning").
 
 Return STRICT JSON format:
 {
@@ -138,25 +152,7 @@ Return STRICT JSON format:
             matched = parsed.matched || [];
             missingSkills = parsed.missingSkills || [];
             missingGeneric = parsed.missingGeneric || [];
-
-            // Move "AI" to missingGeneric if Gemini placed it in missingSkills
-            const aiIndex = missingSkills.findIndex(s => s.toLowerCase().trim() === 'ai');
-            if (aiIndex !== -1) {
-              missingSkills.splice(aiIndex, 1);
-              if (!missingGeneric.includes('AI')) missingGeneric.push('AI');
-            }
-
-            // Guarantee missingGeneric is never empty for live demo purposes
-            if (missingGeneric.length === 0) {
-              missingGeneric = ['B2B SaaS', 'AI Integration', 'Stakeholder Management'];
-            }
-
             isSemantic = true;
-
-            const totalExtracted = matched.length + missingSkills.length + missingGeneric.length;
-            if (totalExtracted > 0) {
-              score = Math.round((matched.length / totalExtracted) * 100);
-            }
           }
         }
       } catch (aiErr) {
@@ -167,12 +163,11 @@ Return STRICT JSON format:
     // Fallback: Deterministic String & Skill Taxonomy Matcher
     if (!isSemantic) {
       const sortedKeywords = extractKeywords(jobDescription, 25);
-      const resumeLower = resumeText.toLowerCase();
       const rawMatched = [];
       const rawMissing = [];
 
       for (const keyword of sortedKeywords) {
-        if (resumeLower.includes(keyword)) {
+        if (isTermInResume(keyword, resumeText)) {
           rawMatched.push(keyword);
         } else {
           rawMissing.push(keyword);
@@ -182,14 +177,37 @@ Return STRICT JSON format:
       matched = rawMatched;
       missingSkills = rawMissing.filter((k) => SKILL_KEYWORDS.has(k.toLowerCase()));
       missingGeneric = rawMissing.filter((k) => !SKILL_KEYWORDS.has(k.toLowerCase()));
-      
-      if (missingGeneric.length === 0) {
-        missingGeneric = ['B2B SaaS', 'AI Integration'];
-      }
-
-      const totalExtracted = matched.length + missingSkills.length + missingGeneric.length;
-      score = totalExtracted > 0 ? Math.round((matched.length / totalExtracted) * 100) : 0;
     }
+
+    // ── RIGOROUS POST-PROCESSING VERIFICATION ──
+    // Verify missing terms against resumeText: if ANY term is present in the resume, MOVE IT TO MATCHED!
+    const verifiedMissingGeneric = [];
+    for (const term of missingGeneric) {
+      if (isTermInResume(term, resumeText)) {
+        if (!matched.some(m => m.toLowerCase() === term.toLowerCase())) {
+          matched.push(term);
+        }
+      } else {
+        verifiedMissingGeneric.push(term);
+      }
+    }
+    missingGeneric = verifiedMissingGeneric;
+
+    const verifiedMissingSkills = [];
+    for (const term of missingSkills) {
+      if (isTermInResume(term, resumeText)) {
+        if (!matched.some(m => m.toLowerCase() === term.toLowerCase())) {
+          matched.push(term);
+        }
+      } else {
+        verifiedMissingSkills.push(term);
+      }
+    }
+    missingSkills = verifiedMissingSkills;
+
+    // Calculate exact ATS alignment score
+    const totalExtracted = matched.length + missingSkills.length + missingGeneric.length;
+    score = totalExtracted > 0 ? Math.round((matched.length / totalExtracted) * 100) : 0;
 
     const missing = [...missingSkills, ...missingGeneric];
 

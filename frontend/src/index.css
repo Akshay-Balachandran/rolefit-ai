@@ -905,6 +905,8 @@ textarea.form-control { resize: vertical; min-height: 120px; line-height: 1.55; 
   position: relative;
   width: 100%;
   margin-bottom: 1.25rem;
+  cursor: pointer !important;
+  user-select: none !important;
 }
 
 .btn-google-custom {
@@ -923,6 +925,14 @@ textarea.form-control { resize: vertical; min-height: 120px; line-height: 1.55; 
   font-size: 0.95rem;
   transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer !important;
+  user-select: none !important;
+}
+
+.btn-google-custom * {
+  cursor: pointer !important;
+  user-select: none !important;
+  pointer-events: none;
 }
 
 .btn-google-custom:hover {
@@ -940,13 +950,14 @@ textarea.form-control { resize: vertical; min-height: 120px; line-height: 1.55; 
   overflow: hidden;
   border-radius: var(--radius-md);
   z-index: 5;
+  cursor: pointer !important;
 }
 
 .google-signin-overlay iframe {
   width: 100% !important;
   height: 100% !important;
   transform: scale(2);
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 .header-logout-btn {
