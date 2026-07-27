@@ -263,6 +263,8 @@ function App() {
   const [generationProgress, setGenerationProgress] = useState(0);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isAtsChecking, setIsAtsChecking] = useState(false);
+  const [isPreCheckingAts, setIsPreCheckingAts] = useState(false);
+  const [preCheckResult, setPreCheckResult] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isListLoading, setIsListLoading] = useState(false);
   
@@ -658,6 +660,46 @@ function App() {
     }
   };
 
+  // Pre-Check ATS & Role Fit on raw profile + JD before generating
+  const handlePreCheckAts = async () => {
+    if (!profileText.trim() || !jobDescription.trim()) return;
+
+    setError('');
+    setIsPreCheckingAts(true);
+
+    try {
+      const response = await fetch('/api/ats/check', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          resumeText: profileText,
+          jobDescription: jobDescription
+        })
+      });
+      const data = await handleApiResponse(response);
+
+      const mSkills = data.missingSkills || [];
+      const mGeneric = data.missingGeneric || (data.missing || []).filter((k) => !mSkills.includes(k));
+      const resObj = {
+        score: data.score,
+        matched: data.matched || [],
+        missing: data.missing || [],
+        missingSkills: mSkills,
+        missingGeneric: mGeneric,
+        verdict: data.verdict
+      };
+      setPreCheckResult(resObj);
+      setAtsResult(resObj);
+      setSuccess('Pre-check complete! Review your role alignment below.');
+    } catch (err) {
+      if (err.message !== 'Unauthorized') {
+        setError(err.message || 'Failed to pre-check role alignment.');
+      }
+    } finally {
+      setIsPreCheckingAts(false);
+    }
+  };
+
   // Save Resume handler
   const handleSaveResume = async () => {
     if (!resumeText) return;
@@ -1014,7 +1056,10 @@ function App() {
                       style={{ minHeight: '300px' }}
                       placeholder="Paste your existing resume raw text, or describe your work experience (company, role, responsibilities), key skills, and credentials…"
                       value={profileText}
-                      onChange={(e) => setProfileText(e.target.value)}
+                      onChange={(e) => {
+                        setProfileText(e.target.value);
+                        if (preCheckResult) setPreCheckResult(null);
+                      }}
                     />
                   </div>
 
@@ -1031,17 +1076,72 @@ function App() {
                       style={{ minHeight: '300px' }}
                       placeholder="Paste the complete responsibilities, qualifications, and requirements from the job description here…"
                       value={jobDescription}
-                      onChange={(e) => setJobDescription(e.target.value)}
+                      onChange={(e) => {
+                        setJobDescription(e.target.value);
+                        if (preCheckResult) setPreCheckResult(null);
+                      }}
                     />
                   </div>
                 </div>
 
-                {/* Generate Button */}
-                <div className="generate-btn-wrap">
+                {/* Pre-Check ATS & Role Alignment Card (Renders BEFORE Generating) */}
+                {preCheckResult && (
+                  <div className="card pre-check-card" style={{ marginTop: '1.25rem', borderLeft: `4px solid ${preCheckResult.score >= 75 ? 'var(--mint)' : preCheckResult.score >= 45 ? '#F59E0B' : '#EF4444'}` }}>
+                    <div className="card-title" style={{ color: preCheckResult.score >= 75 ? 'var(--mint)' : preCheckResult.score >= 45 ? '#F59E0B' : '#EF4444', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <span>{preCheckResult.score < 45 ? '⚠️ Role Unsuitability Warning' : '🔍 Pre-Check Role Alignment Result'}</span>
+                      <span className="score-badge" style={{ background: preCheckResult.score >= 75 ? 'rgba(0,212,168,0.15)' : preCheckResult.score >= 45 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)', color: preCheckResult.score >= 75 ? 'var(--mint)' : preCheckResult.score >= 45 ? '#F59E0B' : '#EF4444', fontSize: '0.85rem', padding: '0.25rem 0.65rem' }}>
+                        {preCheckResult.score}% Initial Match
+                      </span>
+                    </div>
+
+                    <p style={{ fontSize: '0.88rem', lineHeight: '1.6', marginBottom: '1rem', color: 'var(--text-primary)' }}>
+                      {preCheckResult.verdict}
+                    </p>
+
+                    <div className="kw-grid" style={{ marginBottom: '1rem' }}>
+                      <div className="keyword-chips-section">
+                        <div className="keyword-category-title" style={{ color: 'var(--mint)' }}>Matched Existing Skills ({preCheckResult.matched.length})</div>
+                        <div className="chips-container">
+                          {preCheckResult.matched.length === 0 ? <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>None matched yet</span> : preCheckResult.matched.map(skill => <span key={skill} className="kw-chip matched">{skill}</span>)}
+                        </div>
+                      </div>
+
+                      <div className="keyword-chips-section">
+                        <div className="keyword-category-title" style={{ color: '#EF4444' }}>Missing Critical Skills ({preCheckResult.missingSkills.length})</div>
+                        <div className="chips-container">
+                          {preCheckResult.missingSkills.length === 0 ? <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>No major skill gaps</span> : preCheckResult.missingSkills.map(skill => <span key={skill} className="kw-chip skill">{skill}</span>)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {preCheckResult.score < 45 ? (
+                      <div className="role-mismatch-advice" style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px dashed rgba(239, 68, 68, 0.3)', padding: '0.85rem 1rem', borderRadius: '8px', fontSize: '0.82rem', color: '#FCA5A5' }}>
+                        💡 <strong>Recommendation:</strong> Your current profile has significant skill gaps for this target position. We recommend targeting roles closer to your core domain or acquiring the missing skills above. You can still click <strong>"Generate Tailored Resume"</strong> below if you wish to proceed!
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                        ✅ Your profile shows strong alignment for this role! Click <strong>"Generate Tailored Resume"</strong> below to generate your ATS-aligned resume.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Dual Action Buttons (Pre-Check ATS + Generate Resume) */}
+                <div className="generate-btn-wrap" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '1.25rem' }}>
+                  <button
+                    onClick={handlePreCheckAts}
+                    disabled={isPreCheckingAts || isGenerating || !profileText.trim() || !jobDescription.trim()}
+                    className="btn btn-secondary"
+                    style={{ flex: '1 1 220px', maxWidth: '320px', padding: '0.85rem 1.25rem' }}
+                  >
+                    {isPreCheckingAts ? 'Analyzing Eligibility…' : '🔍 Pre-Check ATS & Role Fit'}
+                  </button>
+
                   <button
                     onClick={handleGenerateResume}
                     disabled={isGenerating || !profileText.trim() || !jobDescription.trim()}
                     className="btn btn-primary"
+                    style={{ flex: '1 1 240px', maxWidth: '340px', padding: '0.85rem 1.25rem' }}
                   >
                     {isGenerating ? 'Tailoring with Gemini AI…' : '✦ Generate Tailored Resume'}
                   </button>
