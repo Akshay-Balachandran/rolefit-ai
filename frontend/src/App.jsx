@@ -1208,8 +1208,8 @@ function App() {
                               {atsResult.score}%
                             </div>
                             <div className="ats-verdict-box">
-                              <div className="ats-verdict-title" style={{ color: atsResult.score >= 80 ? 'var(--mint)' : atsResult.score >= 50 ? '#F59E0B' : '#EF4444' }}>
-                                ATS Keyword Optimization
+                              <div className="ats-verdict-title" style={{ color: atsResult.score >= 75 ? 'var(--mint)' : atsResult.score >= 45 ? '#F59E0B' : '#EF4444' }}>
+                                {atsResult.score < 45 ? '⚠️ Role Unsuitability Warning' : 'ATS Keyword Optimization'}
                               </div>
                               <div className="ats-verdict-desc">{atsResult.verdict}</div>
                             </div>

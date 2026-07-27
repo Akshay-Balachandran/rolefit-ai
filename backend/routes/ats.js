@@ -205,20 +205,25 @@ Return STRICT JSON format:
     }
     missingSkills = verifiedMissingSkills;
 
-    // Calculate exact ATS alignment score
+    // Calculate exact ATS alignment score BEFORE capping output lists
     const totalExtracted = matched.length + missingSkills.length + missingGeneric.length;
     score = totalExtracted > 0 ? Math.round((matched.length / totalExtracted) * 100) : 0;
 
+    // Cap output suggestions to prevent overwhelming lists (Max 10 skill gaps, Max 6 generic terms)
+    missingSkills = missingSkills.slice(0, 10);
+    missingGeneric = missingGeneric.slice(0, 6);
+    matched = matched.slice(0, 25);
+
     const missing = [...missingSkills, ...missingGeneric];
 
-    // Generate plain-English verdict
+    // Generate plain-English verdict with graceful role unsuitability message for low scores
     let verdict = '';
-    if (score >= 80) {
+    if (score >= 75) {
       verdict = 'Excellent alignment! Your resume strongly matches the core requirements and skills of this job description.';
-    } else if (score >= 50) {
-      verdict = 'Moderate alignment. Your resume has good foundational matches, but is missing critical skills or domain terms listed below.';
+    } else if (score >= 45) {
+      verdict = 'Moderate alignment. Your profile matches several foundational requirements, but is missing core technical skills or domain terms listed below.';
     } else {
-      verdict = 'Low alignment. Your resume is missing several key technical skills and requirements for this role. We recommend tailoring your profile to include the missing skills.';
+      verdict = `Domain Mismatch Warning (${score}% match): Your current profile shows low alignment with this target position. You appear to be applying outside your primary skill domain. We gracefully advise building foundational domain experience or targeting roles closer to your core expertise before applying.`;
     }
 
     return res.json({
