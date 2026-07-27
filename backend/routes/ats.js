@@ -87,7 +87,36 @@ const isTermInResume = (term, resumeText) => {
     return regex.test(resumeText);
   }
 
-  return resumeLower.includes(cleanTerm);
+  // Check full string match
+  if (resumeLower.includes(cleanTerm)) return true;
+
+  // Check if all main words of a multi-word term are in resume (e.g. "manual testing" -> resume has "manual" and "testing")
+  const words = cleanTerm.split(/[\s-]+/).filter(w => w.length > 2 && !STOP_WORDS.has(w));
+  if (words.length >= 2) {
+    return words.every(w => resumeLower.includes(w));
+  }
+
+  return false;
+};
+
+// Helper: Filters out redundant sub-variations of already matched concepts
+const filterRedundantMissingSkills = (missingList, matchedList) => {
+  const matchedLowers = matchedList.map(m => m.toLowerCase().trim());
+  
+  return missingList.filter(skill => {
+    const sLower = skill.toLowerCase().trim();
+    
+    for (const m of matchedLowers) {
+      if (m === sLower) return false;
+      // If matched has "copilot" and missing has "copilot features"
+      if (sLower.startsWith(m) || sLower.endsWith(m)) return false;
+      // If matched has "ai-powered applications" or "ai" and missing is an AI phrase variation
+      if (sLower.startsWith('ai ') || sLower.startsWith('ai-') || sLower.endsWith(' ai') || sLower.includes('ai ')) {
+        if (m.includes('ai') || m.includes('ai-powered')) return false;
+      }
+    }
+    return true;
+  });
 };
 
 // POST /api/ats/check
@@ -126,9 +155,9 @@ ${resumeText}
 """
 
 INSTRUCTIONS:
-1. "matched": Key skills, tools, or domain terms from the JD that ARE ALREADY present or clearly demonstrated in the candidate's resume (e.g. "Product Strategy", "User Research", "Mixpanel", "Product Analytics", "Roadmap").
-2. "missingGeneric" (SAFE TO ADD): General domain terms, industry buzzwords, or soft methodologies present in the JD but TRULY MISSING from the candidate's resume (e.g. "B2B SaaS", "Stakeholder Management", "Conversion & Retention Metrics", "Sprint Planning", "System Architecture").
-3. "missingSkills" (SKILL GAPS): Genuine, hard technical skills, heavy frameworks, or specialized technical concepts present in the JD but TRULY MISSING from the candidate's resume (e.g. "Large Language Models (LLMs)", "Machine Learning").
+1. "matched": Distinct, unique key skills, tools, or domain terms from the JD that ARE ALREADY present or clearly demonstrated in the candidate's resume.
+2. "missingGeneric" (SAFE TO ADD): General domain terms, industry buzzwords, or soft methodologies present in the JD but TRULY MISSING from the candidate's resume.
+3. "missingSkills" (SKILL GAPS): Distinct, unique technical skills, heavy frameworks, or specialized tools present in the JD but TRULY MISSING from the candidate's resume. Avoid generating multiple repetitive variations of the same root term (e.g. do NOT generate "AI agents", "AI features", "AI Validation" if AI is already covered; pick 1 primary term).
 
 Return STRICT JSON format:
 {
@@ -179,8 +208,8 @@ Return STRICT JSON format:
       missingGeneric = rawMissing.filter((k) => !SKILL_KEYWORDS.has(k.toLowerCase()));
     }
 
-    // ── RIGOROUS POST-PROCESSING VERIFICATION ──
-    // Verify missing terms against resumeText: if ANY term is present in the resume, MOVE IT TO MATCHED!
+    // ── RIGOROUS POST-PROCESSING & DEDUPLICATION ──
+    // 1. Verify missing terms against resumeText: if ANY term or its root words are present in resume, MOVE TO MATCHED!
     const verifiedMissingGeneric = [];
     for (const term of missingGeneric) {
       if (isTermInResume(term, resumeText)) {
@@ -203,7 +232,15 @@ Return STRICT JSON format:
         verifiedMissingSkills.push(term);
       }
     }
-    missingSkills = verifiedMissingSkills;
+
+    // 2. Filter out redundant sub-variations of already matched concepts (e.g. "AI agents", "Copilot features")
+    missingSkills = filterRedundantMissingSkills(verifiedMissingSkills, matched);
+    missingGeneric = filterRedundantMissingSkills(missingGeneric, matched);
+
+    // 3. Deduplicate exact duplicate items inside lists
+    matched = [...new Set(matched)];
+    missingSkills = [...new Set(missingSkills)];
+    missingGeneric = [...new Set(missingGeneric)];
 
     // Calculate exact ATS alignment score BEFORE capping output lists
     const totalExtracted = matched.length + missingSkills.length + missingGeneric.length;
