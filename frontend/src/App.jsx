@@ -570,15 +570,15 @@ function App() {
     }
   };
 
-  // Resume Tailoring Call (with automatic pre-check eligibility guard)
-  const handleGenerateResume = async (forceProceed = false) => {
+  // Resume Tailoring Call (with strict role eligibility guard)
+  const handleGenerateResume = async () => {
     if (!profileText || !jobDescription) return;
 
     setError('');
     setSuccess('');
 
-    // Step 1: Automatic Pre-Check Alignment Guard (runs before generation unless forced)
-    if (!forceProceed && !preCheckResult) {
+    // Step 1: Automatic Role Alignment Eligibility Guard
+    if (!preCheckResult) {
       setIsPreCheckingAts(true);
       try {
         const atsRes = await fetch('/api/ats/check', {
@@ -600,17 +600,20 @@ function App() {
 
         setAtsResult(checkObj);
 
-        // If candidate alignment is low (< 45%), pause generation and display unsuitability warning!
+        // If candidate alignment is low (< 45%), strictly block generation and display unsuitability warning!
         if (atsData.score < 45) {
           setPreCheckResult(checkObj);
           setIsPreCheckingAts(false);
-          return; // Halts generation so user can review and decide!
+          return; // Strictly blocks resume generation!
         }
       } catch (err) {
         console.warn('Pre-check alignment bypass due to network error:', err);
       } finally {
         setIsPreCheckingAts(false);
       }
+    } else if (preCheckResult && preCheckResult.score < 45) {
+      // If preCheckResult already shows low alignment, block generation!
+      return;
     }
 
     // Step 2: Proceed with Gemini AI Resume Tailoring
@@ -1155,20 +1158,13 @@ function App() {
                       💡 <strong>Recommendation:</strong> Your current profile has significant skill gaps for this target position. We gracefully recommend targeting roles closer to your primary domain or acquiring the missing skills above before applying.
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
                       <button
                         onClick={() => setPreCheckResult(null)}
                         className="btn btn-secondary"
-                        style={{ fontSize: '0.82rem', padding: '0.55rem 1rem' }}
+                        style={{ width: '100%', maxWidth: '380px', fontSize: '0.88rem', padding: '0.7rem 1.25rem' }}
                       >
-                        ✏️ Modify Profile or JD
-                      </button>
-                      <button
-                        onClick={() => handleGenerateResume(true)}
-                        className="btn btn-primary"
-                        style={{ fontSize: '0.82rem', padding: '0.55rem 1rem', background: '#EF4444', borderColor: '#EF4444' }}
-                      >
-                        ⚡ Proceed & Tailor Resume Anyway
+                        ✏️ Modify Profile or Target Job Description
                       </button>
                     </div>
                   </div>
@@ -1177,15 +1173,17 @@ function App() {
                 {/* Single Primary Action Button */}
                 <div className="generate-btn-wrap" style={{ display: 'flex', justifyContent: 'center', marginTop: '1.25rem' }}>
                   <button
-                    onClick={() => handleGenerateResume(false)}
-                    disabled={isPreCheckingAts || isGenerating || !profileText.trim() || !jobDescription.trim()}
+                    onClick={handleGenerateResume}
+                    disabled={isPreCheckingAts || isGenerating || !profileText.trim() || !jobDescription.trim() || (preCheckResult && preCheckResult.score < 45)}
                     className="btn btn-primary"
-                    style={{ minWidth: '280px', padding: '0.95rem 1.75rem', fontSize: '1.02rem' }}
+                    style={{ minWidth: '280px', padding: '0.95rem 1.75rem', fontSize: '1.02rem', opacity: (preCheckResult && preCheckResult.score < 45) ? 0.5 : 1 }}
                   >
                     {isPreCheckingAts
                       ? '🔍 Verifying Role Eligibility…'
                       : isGenerating
                       ? 'Tailoring with Gemini AI…'
+                      : (preCheckResult && preCheckResult.score < 45)
+                      ? '⛔ Unsuited for Role — Modify Inputs Above'
                       : '✦ Generate Tailored Resume'}
                   </button>
                 </div>
