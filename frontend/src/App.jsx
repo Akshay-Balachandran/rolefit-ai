@@ -662,6 +662,28 @@ function App() {
       setInitialGeneratedText(data.resumeText);
       setTailoringNotes(data.tailoringNotes || []);
       setSuccess('Resume tailored successfully!');
+
+      // Automatically re-verify ATS keyword alignment against the newly tailored resume text
+      try {
+        const atsRes = await fetch('/api/ats/check', {
+          method: 'POST',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ resumeText: data.resumeText, jobDescription })
+        });
+        const atsData = await handleApiResponse(atsRes);
+        const mSkills = atsData.missingSkills || [];
+        const mGeneric = atsData.missingGeneric || (atsData.missing || []).filter((k) => !mSkills.includes(k));
+        setAtsResult({
+          score: atsData.score,
+          matched: atsData.matched || [],
+          missing: atsData.missing || [],
+          missingSkills: mSkills,
+          missingGeneric: mGeneric,
+          verdict: atsData.verdict
+        });
+      } catch (atsErr) {
+        console.warn('Auto ATS re-verification error:', atsErr);
+      }
     } catch (err) {
       clearInterval(progressInterval);
       setGenerationProgress(0);
