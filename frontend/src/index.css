@@ -952,6 +952,11 @@ textarea.form-control { resize: vertical; min-height: 120px; line-height: 1.55; 
   border-radius: var(--radius-md);
   z-index: 5;
   cursor: pointer !important;
+  pointer-events: auto;
+}
+
+.google-signin-overlay:empty {
+  pointer-events: none !important;
 }
 
 .google-signin-overlay iframe {
@@ -959,6 +964,7 @@ textarea.form-control { resize: vertical; min-height: 120px; line-height: 1.55; 
   height: 100% !important;
   transform: scale(2);
   cursor: pointer !important;
+  pointer-events: auto !important;
 }
 
 .header-logout-btn {
