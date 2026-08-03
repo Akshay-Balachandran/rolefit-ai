@@ -806,7 +806,7 @@ function App() {
     }
   };
 
-  // Insert a generic (safe) keyword into the resume at the cursor position
+  // Insert a generic (safe) keyword into the resume at the cursor position and update ATS score live
   const insertKeyword = (word) => {
     const el = resumeRef.current;
     const text = resumeText;
@@ -818,8 +818,24 @@ function App() {
     const after = text.slice(pos);
     const sep = before && !/\s$/.test(before) ? ' ' : '';
     const insertion = sep + word;
-    setResumeText(before + insertion + after);
+    const updatedText = before + insertion + after;
+    setResumeText(updatedText);
     setSuccess(`Added "${word}" to your resume — reposition it as needed.`);
+
+    // Live update ATS dashboard chips and score
+    if (atsResult.missingGeneric.includes(word)) {
+      const newMissingGeneric = atsResult.missingGeneric.filter(w => w !== word);
+      const newMatched = [...atsResult.matched, word];
+      const total = newMatched.length + newMissingGeneric.length + atsResult.missingSkills.length;
+      const newScore = total > 0 ? Math.round((newMatched.length / total) * 100) : atsResult.score;
+      setAtsResult(prev => ({
+        ...prev,
+        score: newScore,
+        matched: newMatched,
+        missingGeneric: newMissingGeneric,
+      }));
+    }
+
     setTimeout(() => {
       if (el) {
         el.focus();
@@ -1321,8 +1337,9 @@ function App() {
                             onClick={handleAtsCheck}
                             disabled={isAtsChecking}
                             className="btn btn-secondary"
+                            title="Re-evaluate ATS keyword alignment after manual text edits"
                           >
-                            {isAtsChecking ? 'Analyzing…' : '🔍 Check ATS'}
+                            {isAtsChecking ? 'Analyzing…' : '🔄 Re-analyze ATS Score'}
                           </button>
                           <button
                             onClick={handleSaveResume}
