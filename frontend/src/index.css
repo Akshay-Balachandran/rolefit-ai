@@ -832,29 +832,43 @@ textarea.form-control { resize: vertical; min-height: 120px; line-height: 1.55; 
 .skill-tooltip {
   display: none;
   position: absolute;
-  top: calc(100% + 6px); left: 0;
-  z-index: 999;
-  min-width: 195px;
+  top: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  z-index: 9999;
+  min-width: 170px;
+  width: max-content;
+  max-width: 210px;
   background: var(--surface-0);
-  border: 1px solid rgba(239,68,118,0.35);
-  border-radius: var(--radius-sm);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(239, 68, 118, 0.45);
+  border-radius: var(--radius-md);
   padding: 0.65rem 0.75rem;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
 }
 .skill-chip-wrap:hover .skill-tooltip { display: flex; flex-direction: column; gap: 0.4rem; }
-.skill-tooltip-title { font-size: 0.72rem; font-weight: 700; color: #F9A8C4; text-transform: capitalize; margin-bottom: 0.1rem; }
+.skill-tooltip-title { font-size: 0.72rem; font-weight: 700; color: #F9A8C4; text-transform: capitalize; margin-bottom: 0.1rem; white-space: nowrap; }
 .skill-tooltip a {
   font-size: 0.75rem;
   font-weight: 600;
   color: #03241B;
   background: var(--mint);
-  padding: 0.28rem 0.55rem;
+  padding: 0.32rem 0.65rem;
   border-radius: 6px;
   text-decoration: none;
   text-align: center;
-  transition: background 0.15s;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
 }
-.skill-tooltip a:hover { background: var(--mint-hover); }
+.skill-tooltip a:hover { background: var(--mint-hover); transform: translateY(-1px); }
+
+/* Ensure parent containers do not clip tooltips */
+.ats-dashboard, .kw-grid, .keyword-chips-section, .chips-container {
+  overflow: visible !important;
+}
 
 /* ── ATS Tips ── */
 .ats-tips {
