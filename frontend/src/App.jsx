@@ -78,23 +78,25 @@ const escapeRegExp = (string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
-const getManualSkillsAdded = (text, missingSkills = [], profileText = '') => {
-  if (!text || !missingSkills || !missingSkills.length) return [];
+const getManualSkillsAdded = (currentText, missingSkills = [], profileText = '', initialText = '') => {
+  if (!currentText || !missingSkills || !missingSkills.length) return [];
   const added = [];
   const profileLower = (profileText || '').toLowerCase();
+  const initialLower = (initialText || '').toLowerCase();
 
   for (const skill of missingSkills) {
     const cleanSkill = skill.toLowerCase().trim();
     if (!cleanSkill || cleanSkill.length <= 2) continue;
-    // Common terms that should not trigger manual insertion warnings
+    // Common broad terms that should not trigger manual insertion warnings
     if (['ai', 'saas', 'b2b', 'testing', 'software', 'management', 'development', 'analysis'].includes(cleanSkill)) continue;
 
-    // If the skill is already present in the candidate's original raw profileText, IT IS REAL! Skip it!
+    // If the skill was already present in candidate's raw profileText OR in the initial generated resumeText, skip it!
     const regex = new RegExp(`\\b${escapeRegExp(skill)}\\b`, 'i');
     if (profileLower && regex.test(profileLower)) continue;
+    if (initialLower && regex.test(initialLower)) continue;
 
-    // Only flag if the skill is genuinely missing from candidate's profile AND exists in resumeText
-    if (regex.test(text)) {
+    // Only flag if the candidate manually typed a missing skill gap into currentText that wasn't in initial generated text!
+    if (regex.test(currentText)) {
       added.push(skill);
     }
   }
@@ -253,6 +255,7 @@ function App() {
   const [profileText, setProfileText] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [resumeText, setResumeText] = useState('');
+  const [initialGeneratedText, setInitialGeneratedText] = useState('');
   const [tailoringNotes, setTailoringNotes] = useState([]);
   const [atsResult, setAtsResult] = useState({
     score: null,
@@ -656,6 +659,7 @@ function App() {
       await new Promise(resolve => setTimeout(resolve, 350));
 
       setResumeText(data.resumeText);
+      setInitialGeneratedText(data.resumeText);
       setTailoringNotes(data.tailoringNotes || []);
       setSuccess('Resume tailored successfully!');
     } catch (err) {
@@ -1314,13 +1318,13 @@ function App() {
                           placeholder="Your tailored resume text will appear here. Edit it directly."
                         />
 
-                        {getManualSkillsAdded(resumeText, atsResult.missingSkills, profileText).length > 0 && (
+                        {getManualSkillsAdded(resumeText, atsResult.missingSkills, profileText, initialGeneratedText).length > 0 && (
                           <div className="error-banner" style={{ marginTop: '0.6rem', marginBottom: 0 }}>
                             <span>⚠️</span>
                             <div>
-                              <strong>Skill Gap Warning:</strong> You have manually inserted a skill you haven't acquired yet:{' '}
-                              <strong>{getManualSkillsAdded(resumeText, atsResult.missingSkills, profileText).join(', ')}</strong>.
-                              Please verify your experience before submitting.
+                              <strong>Skill Gap Warning:</strong> You have manually typed a skill gap into your resume:{' '}
+                              <strong>{getManualSkillsAdded(resumeText, atsResult.missingSkills, profileText, initialGeneratedText).join(', ')}</strong>.
+                              Take a course to acquire this skill rather than typing it into your resume.
                             </div>
                           </div>
                         )}
