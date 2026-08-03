@@ -78,13 +78,22 @@ const escapeRegExp = (string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
-const getManualSkillsAdded = (text, missingSkills = []) => {
-  if (!text) return [];
+const getManualSkillsAdded = (text, missingSkills = [], profileText = '') => {
+  if (!text || !missingSkills || !missingSkills.length) return [];
   const added = [];
+  const profileLower = (profileText || '').toLowerCase();
+
   for (const skill of missingSkills) {
     const cleanSkill = skill.toLowerCase().trim();
-    if (cleanSkill === 'ai' || cleanSkill === 'saas' || cleanSkill === 'b2b') continue;
+    if (!cleanSkill || cleanSkill.length <= 2) continue;
+    // Common terms that should not trigger manual insertion warnings
+    if (['ai', 'saas', 'b2b', 'testing', 'software', 'management', 'development', 'analysis'].includes(cleanSkill)) continue;
+
+    // If the skill is already present in the candidate's original raw profileText, IT IS REAL! Skip it!
     const regex = new RegExp(`\\b${escapeRegExp(skill)}\\b`, 'i');
+    if (profileLower && regex.test(profileLower)) continue;
+
+    // Only flag if the skill is genuinely missing from candidate's profile AND exists in resumeText
     if (regex.test(text)) {
       added.push(skill);
     }
@@ -1305,13 +1314,13 @@ function App() {
                           placeholder="Your tailored resume text will appear here. Edit it directly."
                         />
 
-                        {getManualSkillsAdded(resumeText, atsResult.missingSkills).length > 0 && (
+                        {getManualSkillsAdded(resumeText, atsResult.missingSkills, profileText).length > 0 && (
                           <div className="error-banner" style={{ marginTop: '0.6rem', marginBottom: 0 }}>
                             <span>⚠️</span>
                             <div>
                               <strong>Skill Gap Warning:</strong> You have manually inserted a skill you haven't acquired yet:{' '}
-                              <strong>{getManualSkillsAdded(resumeText, atsResult.missingSkills).join(', ')}</strong>.
-                              Please remove it to save or check readiness.
+                              <strong>{getManualSkillsAdded(resumeText, atsResult.missingSkills, profileText).join(', ')}</strong>.
+                              Please verify your experience before submitting.
                             </div>
                           </div>
                         )}
@@ -1343,7 +1352,7 @@ function App() {
                           </button>
                           <button
                             onClick={handleSaveResume}
-                            disabled={isSaving || getManualSkillsAdded(resumeText, atsResult.missingSkills).length > 0}
+                            disabled={isSaving}
                             className="btn btn-secondary"
                           >
                             {isSaving ? 'Saving…' : '💾 Save Resume'}
