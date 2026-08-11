@@ -254,6 +254,7 @@ function App() {
   const [activeView, setActiveView] = useState('generator'); // 'generator' | 'results'
   const [profileText, setProfileText] = useState('');
   const [jobDescription, setJobDescription] = useState('');
+  const [jdUrl, setJdUrl] = useState('');
   const [resumeText, setResumeText] = useState('');
   const [initialGeneratedText, setInitialGeneratedText] = useState('');
   const [tailoringNotes, setTailoringNotes] = useState([]);
@@ -274,6 +275,7 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isExtractingJdUrl, setIsExtractingJdUrl] = useState(false);
   const [isAtsChecking, setIsAtsChecking] = useState(false);
   const [isPreCheckingAts, setIsPreCheckingAts] = useState(false);
   const [preCheckResult, setPreCheckResult] = useState(null);
@@ -578,6 +580,37 @@ function App() {
       setIsExtracting(false);
       // Reset input value so same file can be uploaded again
       e.target.value = '';
+    }
+  };
+
+  // Extract Job Description from a URL link
+  const handleExtractJdFromUrl = async () => {
+    if (!jdUrl.trim()) {
+      setError('Please enter a job posting URL (e.g. LinkedIn, Indeed, Naukri, or company career page).');
+      return;
+    }
+
+    setError('');
+    setSuccess('');
+    setIsExtractingJdUrl(true);
+
+    try {
+      const response = await fetch('/api/profile/extract-url', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ url: jdUrl.trim() }),
+      });
+      const data = await handleApiResponse(response);
+
+      setJobDescription(data.text);
+      setSuccess('Job description extracted successfully from link!');
+      if (preCheckResult) setPreCheckResult(null);
+    } catch (err) {
+      if (err.message !== 'Unauthorized') {
+        setError(err.message || 'Failed to extract job description from URL.');
+      }
+    } finally {
+      setIsExtractingJdUrl(false);
     }
   };
 
@@ -1159,12 +1192,40 @@ function App() {
                       Target Job Description
                     </label>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', lineHeight: 1.5 }}>
-                      Paste the full job description of the position you are applying for.
+                      Paste a job posting URL to extract automatically, or paste the text directly below.
                     </p>
+
+                    {/* URL Extraction Bar */}
+                    <div style={{ display: 'flex', gap: '0.45rem', marginBottom: '0.75rem' }}>
+                      <input
+                        type="url"
+                        className="form-control"
+                        style={{ flex: 1, fontSize: '0.82rem', padding: '0.45rem 0.7rem' }}
+                        placeholder="🔗 Paste job URL (LinkedIn, Indeed, Naukri, Lever, Workday...)"
+                        value={jdUrl}
+                        onChange={(e) => setJdUrl(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleExtractJdFromUrl();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ whiteSpace: 'nowrap', padding: '0.45rem 0.85rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                        onClick={handleExtractJdFromUrl}
+                        disabled={isExtractingJdUrl || !jdUrl.trim()}
+                      >
+                        {isExtractingJdUrl ? '⚡ Extracting…' : '⚡ Extract Link'}
+                      </button>
+                    </div>
+
                     <textarea
                       className="form-control"
-                      style={{ minHeight: '300px' }}
-                      placeholder="Paste the complete responsibilities, qualifications, and requirements from the job description here…"
+                      style={{ minHeight: '260px' }}
+                      placeholder="Paste the complete responsibilities, qualifications, and requirements from the job description here (or extract automatically via URL above)…"
                       value={jobDescription}
                       onChange={(e) => {
                         setJobDescription(e.target.value);
