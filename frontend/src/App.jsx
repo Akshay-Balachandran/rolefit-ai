@@ -1192,40 +1192,76 @@ function App() {
                       Target Job Description
                     </label>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', lineHeight: 1.5 }}>
-                      Paste a job posting URL to extract automatically, or paste the text directly below.
+                      Extract text from a job posting URL automatically, or paste the text directly below.
                     </p>
 
-                    {/* URL Extraction Bar */}
-                    <div style={{ display: 'flex', gap: '0.45rem', marginBottom: '0.75rem' }}>
-                      <input
-                        type="url"
-                        className="form-control"
-                        style={{ flex: 1, fontSize: '0.82rem', padding: '0.45rem 0.7rem' }}
-                        placeholder="🔗 Paste job URL (LinkedIn, Indeed, Naukri, Lever, Workday...)"
-                        value={jdUrl}
-                        onChange={(e) => setJdUrl(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleExtractJdFromUrl();
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ whiteSpace: 'nowrap', padding: '0.45rem 0.85rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                        onClick={handleExtractJdFromUrl}
-                        disabled={isExtractingJdUrl || !jdUrl.trim()}
-                      >
-                        {isExtractingJdUrl ? '⚡ Extracting…' : '⚡ Extract Link'}
-                      </button>
+                    {/* URL Extraction Box */}
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '0.85rem 1rem',
+                      marginBottom: '0.85rem'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>🔗</span> Extract from Job Posting URL
+                        </label>
+                        {jdUrl.trim() && (
+                          <span style={{ fontSize: '0.72rem', color: 'var(--mint)', fontWeight: 500 }}>
+                            ✓ URL entered
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', width: '100%', alignItems: 'center' }}>
+                          <input
+                            type="url"
+                            className="form-control"
+                            style={{ flex: 1, minWidth: 0, width: '100%', fontSize: '0.83rem', padding: '0.55rem 0.75rem' }}
+                            placeholder="Paste job link (e.g. https://linkedin.com/jobs/view/...)"
+                            value={jdUrl}
+                            onChange={(e) => setJdUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleExtractJdFromUrl();
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{
+                              whiteSpace: 'nowrap',
+                              padding: '0.55rem 1rem',
+                              fontSize: '0.83rem',
+                              fontWeight: 600,
+                              flexShrink: 0
+                            }}
+                            onClick={handleExtractJdFromUrl}
+                            disabled={isExtractingJdUrl || !jdUrl.trim()}
+                          >
+                            {isExtractingJdUrl ? '⚡ Fetching…' : '⚡ Extract JD'}
+                          </button>
+                        </div>
+
+                        {/* Live Status Helper */}
+                        <div style={{ fontSize: '0.72rem', color: isExtractingJdUrl ? 'var(--mint)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          {isExtractingJdUrl ? (
+                            <span>⏳ Fetching page content & parsing job details with Gemini AI…</span>
+                          ) : (
+                            <span>Supports LinkedIn, Indeed, Naukri, Glassdoor, Lever, Workday & company career sites</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     <textarea
                       className="form-control"
-                      style={{ minHeight: '260px' }}
-                      placeholder="Paste the complete responsibilities, qualifications, and requirements from the job description here (or extract automatically via URL above)…"
+                      style={{ minHeight: '230px' }}
+                      placeholder="Job description responsibilities, qualifications, and requirements will appear here after extracting from link above (or paste text manually)…"
                       value={jobDescription}
                       onChange={(e) => {
                         setJobDescription(e.target.value);
