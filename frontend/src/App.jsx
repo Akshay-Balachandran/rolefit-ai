@@ -1192,34 +1192,42 @@ function App() {
                       Target Job Description
                     </label>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', lineHeight: 1.5 }}>
-                      Extract text from a job posting URL automatically, or paste the text directly below.
+                      Extract text from a job posting link automatically, or paste raw text manually below.
                     </p>
 
-                    {/* URL Extraction Box */}
+                    {/* URL Extraction Box (Stacked Full-Width Layout) */}
                     <div style={{
                       background: 'rgba(255, 255, 255, 0.02)',
                       border: '1px solid var(--border-color)',
                       borderRadius: 'var(--radius-sm)',
-                      padding: '0.85rem 1rem',
+                      padding: '0.9rem 1rem',
                       marginBottom: '0.85rem'
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <span>🔗</span> Extract from Job Posting URL
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>🔗</span> Extract from Job Link
                         </label>
                         {jdUrl.trim() && (
-                          <span style={{ fontSize: '0.72rem', color: 'var(--mint)', fontWeight: 500 }}>
-                            ✓ URL entered
+                          <span style={{ fontSize: '0.72rem', color: 'var(--mint)', fontWeight: 600 }}>
+                            ✓ URL Entered
                           </span>
                         )}
                       </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', width: '100%', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                        {/* Row 1: Full-Width URL Input */}
+                        <div style={{ width: '100%' }}>
                           <input
                             type="url"
                             className="form-control"
-                            style={{ flex: 1, minWidth: 0, width: '100%', fontSize: '0.83rem', padding: '0.55rem 0.75rem' }}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              fontSize: '0.84rem',
+                              padding: '0.6rem 0.8rem',
+                              background: 'rgba(0, 0, 0, 0.25)',
+                              border: '1px solid var(--border-soft)'
+                            }}
                             placeholder="Paste job link (e.g. https://linkedin.com/jobs/view/...)"
                             value={jdUrl}
                             onChange={(e) => setJdUrl(e.target.value)}
@@ -1230,32 +1238,51 @@ function App() {
                               }
                             }}
                           />
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{
-                              whiteSpace: 'nowrap',
-                              padding: '0.55rem 1rem',
-                              fontSize: '0.83rem',
-                              fontWeight: 600,
-                              flexShrink: 0
-                            }}
-                            onClick={handleExtractJdFromUrl}
-                            disabled={isExtractingJdUrl || !jdUrl.trim()}
-                          >
-                            {isExtractingJdUrl ? '⚡ Fetching…' : '⚡ Extract JD'}
-                          </button>
                         </div>
 
+                        {/* Row 2: Full-Width Extract Button */}
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{
+                            width: '100%',
+                            padding: '0.6rem 1rem',
+                            fontSize: '0.84rem',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.4rem'
+                          }}
+                          onClick={handleExtractJdFromUrl}
+                          disabled={isExtractingJdUrl || !jdUrl.trim()}
+                        >
+                          {isExtractingJdUrl ? '⚡ Fetching & Extracting Job Details…' : '⚡ Extract Job Details from Link'}
+                        </button>
+
                         {/* Live Status Helper */}
-                        <div style={{ fontSize: '0.72rem', color: isExtractingJdUrl ? 'var(--mint)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <div style={{ fontSize: '0.72rem', color: isExtractingJdUrl ? 'var(--mint)' : 'var(--text-muted)', textAlign: 'center', marginTop: '0.1rem' }}>
                           {isExtractingJdUrl ? (
-                            <span>⏳ Fetching page content & parsing job details with Gemini AI…</span>
+                            <span>⏳ Scraping webpage & extracting job description with Gemini AI…</span>
                           ) : (
                             <span>Supports LinkedIn, Indeed, Naukri, Glassdoor, Lever, Workday & company career sites</span>
                           )}
                         </div>
                       </div>
+                    </div>
+
+                    {/* Section Divider */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      margin: '0.75rem 0 0.85rem 0',
+                      color: 'var(--text-muted)',
+                      fontSize: '0.72rem',
+                      fontWeight: 600
+                    }}>
+                      <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
+                      <span style={{ padding: '0 0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>or paste job text manually below</span>
+                      <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
                     </div>
 
                     <textarea
