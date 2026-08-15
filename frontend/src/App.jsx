@@ -1722,17 +1722,6 @@ function App() {
                   <li><strong>100% Privacy:</strong> Files are processed strictly in server memory without saving to disk.</li>
                 </ul>
               </div>
-
-              {/* Section 4: Capstone Project Credits */}
-              <div className="info-section info-credits">
-                <h4>Capstone Project Credits</h4>
-                <div className="credits-grid">
-                  <div><strong>Candidate:</strong> Akshay Balachandran (BITS ID: 202217B2004)</div>
-                  <div><strong>Institution:</strong> BITS Pilani — WILP Division</div>
-                  <div><strong>Supervisor:</strong> Sudhir Kumar Akkisetty (HCLTech)</div>
-                  <div><strong>Live App:</strong> <a href="https://rolefit-live.vercel.app" target="_blank" rel="noreferrer">rolefit-live.vercel.app</a></div>
-                </div>
-              </div>
             </div>
 
             <div className="info-modal-footer">
