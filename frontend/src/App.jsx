@@ -281,6 +281,7 @@ function App() {
   const [preCheckResult, setPreCheckResult] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isListLoading, setIsListLoading] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   
   // Feedback States
   const [error, setError] = useState('');
@@ -1063,6 +1064,14 @@ function App() {
           </div>
 
           <div className="user-nav">
+            <button 
+              onClick={() => setShowInfoModal(true)} 
+              className="btn btn-secondary header-logout-btn"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.45rem 0.85rem' }}
+              title="Learn how RoleFit AI works & view project guide"
+            >
+              ℹ️ About & Guide
+            </button>
             <div className="user-info">
               <span className="user-info-label">Logged in as: </span>
               <span className="user-name">{user?.name}</span>
@@ -1645,6 +1654,96 @@ function App() {
           </section>
         </main>
       </div>
+
+      {/* Info / Guide Modal */}
+      {showInfoModal && (
+        <div className="info-modal-backdrop" onClick={() => setShowInfoModal(false)}>
+          <div className="info-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="info-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <RoleFitLogo size={32} />
+                <div>
+                  <h3 style={{ margin: 0, fontFamily: 'var(--font-title)', fontSize: '1.2rem', color: 'var(--text-primary)' }}>
+                    About <span style={{ color: 'var(--mint)' }}>RoleFit AI</span>
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    ATS-Aligned Resume Tailoring &amp; Skill Gap Engine
+                  </span>
+                </div>
+              </div>
+              <button className="info-modal-close" onClick={() => setShowInfoModal(false)} title="Close Guide">✕</button>
+            </div>
+
+            <div className="info-modal-body">
+              {/* Section 1: Product Overview */}
+              <div className="info-section">
+                <h4>🚀 What is RoleFit AI?</h4>
+                <p>
+                  RoleFit AI helps job seekers pass automated Applicant Tracking Systems (ATS) ethically and quickly. 
+                  Unlike generic AI chatbots that invent fake work experience, RoleFit AI aligns your real profile text with target job requirements while enforcing zero fabrication.
+                </p>
+              </div>
+
+              {/* Section 2: How It Works (3 Steps) */}
+              <div className="info-section">
+                <h4>⚡ How It Works in 3 Simple Steps</h4>
+                <div className="info-steps-grid">
+                  <div className="info-step-card">
+                    <span className="step-num">1</span>
+                    <div>
+                      <strong>Provide Profile &amp; Job Description</strong>
+                      <p>Upload a resume (.pdf, .docx, .txt), paste text, or paste a job posting link (LinkedIn, Indeed, Naukri, etc.).</p>
+                    </div>
+                  </div>
+                  <div className="info-step-card">
+                    <span className="step-num">2</span>
+                    <div>
+                      <strong>Automatic Pre-Check &amp; AI Tailoring</strong>
+                      <p>RoleFit AI verifies role compatibility upfront (&ge;45% score) and tailors your resume bullets using Google Gemini AI.</p>
+                    </div>
+                  </div>
+                  <div className="info-step-card">
+                    <span className="step-num">3</span>
+                    <div>
+                      <strong>Interactive Keywords &amp; ATS PDF Export</strong>
+                      <p>View Matched (Green), Safe to Add (Yellow), and Skill Gaps (Red) with Coursera/Udemy links. Export a clean PDF in 1 click.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Key Features & Ethics */}
+              <div className="info-section">
+                <h4>🛡️ Core Features &amp; Ethical Principles</h4>
+                <ul className="info-features-list">
+                  <li><strong>Upfront Role Guard:</strong> Halts generation if alignment is under 45% to prevent role mismatch.</li>
+                  <li><strong>Zero-Fabrication Policy:</strong> Rephrases experience accurately without creating fake roles or unearned degrees.</li>
+                  <li><strong>Skill Gap Learning:</strong> Unacquired technical skills are non-addable red chips linked to Coursera &amp; Udemy courses.</li>
+                  <li><strong>Data Extraction:</strong> Built-in PDF/DOCX parsers and automated web link scraping for job postings.</li>
+                  <li><strong>100% Privacy:</strong> Files are processed strictly in server memory without saving to disk.</li>
+                </ul>
+              </div>
+
+              {/* Section 4: Capstone Project Credits */}
+              <div className="info-section info-credits">
+                <h4>🎓 Capstone Project Credits</h4>
+                <div className="credits-grid">
+                  <div><strong>Candidate:</strong> Akshay Balachandran (BITS ID: 202217B2004)</div>
+                  <div><strong>Institution:</strong> BITS Pilani — WILP Division</div>
+                  <div><strong>Supervisor:</strong> Sudhir Kumar Akkisetty (HCLTech)</div>
+                  <div><strong>Live App:</strong> <a href="https://rolefit-live.vercel.app" target="_blank" rel="noreferrer">rolefit-live.vercel.app</a></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="info-modal-footer">
+              <button className="btn btn-primary" style={{ padding: '0.6rem 1.25rem', fontSize: '0.85rem' }} onClick={() => setShowInfoModal(false)}>
+                Got It — Let's Get Started!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
