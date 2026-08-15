@@ -104,12 +104,12 @@ const getManualSkillsAdded = (currentText, missingSkills = [], profileText = '',
 };
 
 const getProgressStatusMessage = (progress) => {
-  if (progress < 20) return "🔍 Analyzing profile and job description...";
-  if (progress < 45) return "🔑 Extracting priority keywords...";
-  if (progress < 75) return "✍️ Aligning skills and experience with Gemini...";
-  if (progress < 90) return "✨ Polishing and formatting sections...";
-  if (progress < 100) return "⏳ Finalizing your tailored resume...";
-  return "🎉 Done!";
+  if (progress < 20) return "Analyzing profile and job description...";
+  if (progress < 45) return "Extracting priority keywords...";
+  if (progress < 75) return "Aligning skills and experience with Gemini AI...";
+  if (progress < 90) return "Polishing and formatting sections...";
+  if (progress < 100) return "Finalizing your tailored resume...";
+  return "Done!";
 };
 
 
@@ -1070,7 +1070,7 @@ function App() {
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.45rem 0.85rem' }}
               title="Learn how RoleFit AI works & view project guide"
             >
-              ℹ️ About & Guide
+              About &amp; Guide
             </button>
             <div className="user-info">
               <span className="user-info-label">Logged in as: </span>
@@ -1084,12 +1084,12 @@ function App() {
 
         {error && (
           <div className="error-banner" style={{ margin: '1.25rem 2rem 0' }}>
-            <span>⚠️</span> {error}
+            {error}
           </div>
         )}
         {success && (
           <div className="success-banner" style={{ margin: '1.25rem 2rem 0' }}>
-            ✅ {success}
+            {success}
           </div>
         )}
 
@@ -1121,7 +1121,7 @@ function App() {
                           onClick={(e) => handleDeleteResume(resume._id, resume.title, e)}
                           title="Delete saved resume"
                         >
-                          🗑️
+                          ✕
                         </span>
                       </div>
                       <div className="resume-item-meta">
@@ -1214,11 +1214,11 @@ function App() {
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                         <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <span>🔗</span> Extract from Job Link
+                          Extract from Job Link
                         </label>
                         {jdUrl.trim() && (
                           <span style={{ fontSize: '0.72rem', color: 'var(--mint)', fontWeight: 600 }}>
-                            ✓ URL Entered
+                            URL Entered
                           </span>
                         )}
                       </div>
@@ -1266,15 +1266,15 @@ function App() {
                           onClick={handleExtractJdFromUrl}
                           disabled={isExtractingJdUrl || !jdUrl.trim()}
                         >
-                          {isExtractingJdUrl ? '⚡ Fetching & Extracting Job Details…' : '⚡ Extract Job Details from Link'}
+                          {isExtractingJdUrl ? 'Fetching & Extracting Job Details…' : 'Extract Job Details from Link'}
                         </button>
 
                         {/* Live Status Helper */}
                         <div style={{ fontSize: '0.72rem', color: isExtractingJdUrl ? 'var(--mint)' : 'var(--text-muted)', textAlign: 'center', marginTop: '0.1rem' }}>
                           {isExtractingJdUrl ? (
-                            <span>⏳ Scraping webpage & extracting job description with Gemini AI…</span>
+                            <span>Scraping webpage &amp; extracting job description with Gemini AI…</span>
                           ) : (
-                            <span>Supports LinkedIn, Indeed, Naukri, Glassdoor, Lever, Workday & company career sites</span>
+                            <span>Supports LinkedIn, Indeed, Naukri, Glassdoor, Lever, Workday &amp; company career sites</span>
                           )}
                         </div>
                       </div>
@@ -1311,7 +1311,7 @@ function App() {
                 {preCheckResult && preCheckResult.score < 45 && (
                   <div className="card pre-check-card" style={{ marginTop: '1.25rem', borderLeft: '4px solid #EF4444' }}>
                     <div className="card-title" style={{ color: '#EF4444', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <span>⚠️ Role Unsuitability Warning</span>
+                      <span>Role Unsuitability Warning</span>
                       <span className="score-badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', fontSize: '0.85rem', padding: '0.25rem 0.65rem' }}>
                         {preCheckResult.score}% Alignment Match
                       </span>
@@ -1338,7 +1338,7 @@ function App() {
                     </div>
 
                     <div className="role-mismatch-advice" style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px dashed rgba(239, 68, 68, 0.3)', padding: '0.85rem 1rem', borderRadius: '8px', fontSize: '0.82rem', color: '#FCA5A5', marginBottom: '1rem' }}>
-                      💡 <strong>Recommendation:</strong> Your current profile has significant skill gaps for this target position. We gracefully recommend targeting roles closer to your primary domain or acquiring the missing skills above before applying.
+                      <strong>Recommendation:</strong> Your current profile has significant skill gaps for this target position. We gracefully recommend targeting roles closer to your primary domain or acquiring the missing skills above before applying.
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -1347,7 +1347,7 @@ function App() {
                         className="btn btn-secondary"
                         style={{ width: '100%', maxWidth: '380px', fontSize: '0.88rem', padding: '0.7rem 1.25rem' }}
                       >
-                        ✏️ Modify Profile or Target Job Description
+                        Modify Profile or Target Job Description
                       </button>
                     </div>
                   </div>
@@ -1362,12 +1362,12 @@ function App() {
                     style={{ minWidth: '280px', padding: '0.95rem 1.75rem', fontSize: '1.02rem', opacity: (preCheckResult && preCheckResult.score < 45) ? 0.5 : 1 }}
                   >
                     {isPreCheckingAts
-                      ? '🔍 Verifying Role Eligibility…'
+                      ? 'Verifying Role Eligibility…'
                       : isGenerating
                       ? 'Tailoring with Gemini AI…'
                       : (preCheckResult && preCheckResult.score < 45)
-                      ? '⛔ Unsuited for Role — Modify Inputs Above'
-                      : '✦ Generate Tailored Resume'}
+                      ? 'Unsuited for Role — Modify Inputs Above'
+                      : 'Generate Tailored Resume'}
                   </button>
                 </div>
               </>
@@ -1475,7 +1475,6 @@ function App() {
 
                         {getManualSkillsAdded(resumeText, atsResult.missingSkills, profileText, initialGeneratedText).length > 0 && (
                           <div className="error-banner" style={{ marginTop: '0.6rem', marginBottom: 0 }}>
-                            <span>⚠️</span>
                             <div>
                               <strong>Skill Gap Warning:</strong> You have manually typed a skill gap into your resume:{' '}
                               <strong>{getManualSkillsAdded(resumeText, atsResult.missingSkills, profileText, initialGeneratedText).join(', ')}</strong>.
@@ -1507,20 +1506,20 @@ function App() {
                             className="btn btn-secondary"
                             title="Re-evaluate ATS keyword alignment after manual text edits"
                           >
-                            {isAtsChecking ? 'Analyzing…' : '🔄 Re-analyze ATS Score'}
+                            {isAtsChecking ? 'Analyzing…' : 'Re-analyze ATS Score'}
                           </button>
                           <button
                             onClick={handleSaveResume}
                             disabled={isSaving}
                             className="btn btn-secondary"
                           >
-                            {isSaving ? 'Saving…' : '💾 Save Resume'}
+                            {isSaving ? 'Saving…' : 'Save Resume'}
                           </button>
                           <button
                             onClick={handleExportPdf}
                             className="btn btn-primary"
                           >
-                            📄 Export PDF
+                            Export PDF
                           </button>
                         </div>
                       </div>
@@ -1534,7 +1533,7 @@ function App() {
                             </div>
                             <div className="ats-verdict-box">
                               <div className="ats-verdict-title" style={{ color: atsResult.score >= 75 ? 'var(--mint)' : atsResult.score >= 45 ? '#F59E0B' : '#EF4444' }}>
-                                {atsResult.score < 45 ? '⚠️ Role Unsuitability Warning' : 'ATS Keyword Optimization'}
+                                {atsResult.score < 45 ? 'Role Unsuitability Warning' : 'ATS Keyword Optimization'}
                               </div>
                               <div className="ats-verdict-desc">{atsResult.verdict}</div>
                             </div>
@@ -1677,7 +1676,7 @@ function App() {
             <div className="info-modal-body">
               {/* Section 1: Product Overview */}
               <div className="info-section">
-                <h4>🚀 What is RoleFit AI?</h4>
+                <h4>What is RoleFit AI?</h4>
                 <p>
                   RoleFit AI helps job seekers pass automated Applicant Tracking Systems (ATS) ethically and quickly. 
                   Unlike generic AI chatbots that invent fake work experience, RoleFit AI aligns your real profile text with target job requirements while enforcing zero fabrication.
@@ -1686,7 +1685,7 @@ function App() {
 
               {/* Section 2: How It Works (3 Steps) */}
               <div className="info-section">
-                <h4>⚡ How It Works in 3 Simple Steps</h4>
+                <h4>How It Works in 3 Simple Steps</h4>
                 <div className="info-steps-grid">
                   <div className="info-step-card">
                     <span className="step-num">1</span>
@@ -1714,7 +1713,7 @@ function App() {
 
               {/* Section 3: Key Features & Ethics */}
               <div className="info-section">
-                <h4>🛡️ Core Features &amp; Ethical Principles</h4>
+                <h4>Core Features &amp; Ethical Principles</h4>
                 <ul className="info-features-list">
                   <li><strong>Upfront Role Guard:</strong> Halts generation if alignment is under 45% to prevent role mismatch.</li>
                   <li><strong>Zero-Fabrication Policy:</strong> Rephrases experience accurately without creating fake roles or unearned degrees.</li>
@@ -1726,7 +1725,7 @@ function App() {
 
               {/* Section 4: Capstone Project Credits */}
               <div className="info-section info-credits">
-                <h4>🎓 Capstone Project Credits</h4>
+                <h4>Capstone Project Credits</h4>
                 <div className="credits-grid">
                   <div><strong>Candidate:</strong> Akshay Balachandran (BITS ID: 202217B2004)</div>
                   <div><strong>Institution:</strong> BITS Pilani — WILP Division</div>
