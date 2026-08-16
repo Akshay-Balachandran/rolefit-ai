@@ -1501,14 +1501,6 @@ function App() {
                         {/* Action Buttons */}
                         <div className="editor-actions">
                           <button
-                            onClick={handleAtsCheck}
-                            disabled={isAtsChecking}
-                            className="btn btn-secondary"
-                            title="Re-evaluate ATS keyword alignment after manual text edits"
-                          >
-                            {isAtsChecking ? 'Analyzing…' : 'Re-analyze ATS Score'}
-                          </button>
-                          <button
                             onClick={handleSaveResume}
                             disabled={isSaving}
                             className="btn btn-secondary"
