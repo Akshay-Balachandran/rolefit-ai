@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RoleFit AI — Live System Architecture & Workflow Simulator</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      --bg-dark: #070D18;
+      --card-dark: #0B1726;
+      --card-border: rgba(255, 255, 255, 0.08);
+      --mint: #00D4A8;
+      --mint-glow: rgba(0, 212, 168, 0.25);
+      --blue-accent: #3B82F6;
+      --amber-accent: #F59E0B;
+      --purple-accent: #8B5CF6;
+      --red-accent: #EF4444;
+      --text-main: #F3F4F6;
+      --text-muted: #9CA3AF;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    /* Pulse & Flow Animation Styles */
+    .flow-line {
+      stroke-dasharray: 8 6;
+      animation: dash 1.5s linear infinite;
+    }
+
+    @keyframes dash {
+      to {
+        stroke-dashoffset: -28;
+      }
+    }
+
+    .pulse-particle {
+      filter: drop-shadow(0 0 6px var(--mint));
+    }
+
+    .node-card {
+      background-color: var(--card-dark);
+      border: 1px solid var(--card-border);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .node-card:hover {
+      border-color: rgba(0, 212, 168, 0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px -10px rgba(0, 212, 168, 0.2);
+    }
+
+    .node-card.active {
+      border-color: var(--mint) !important;
+      box-shadow: 0 0 25px var(--mint-glow) !important;
+    }
+
+    .badge-mint {
+      background: rgba(0, 212, 168, 0.12);
+      color: var(--mint);
+      border: 1px solid rgba(0, 212, 168, 0.3);
+    }
+
+    .badge-blue {
+      background: rgba(59, 130, 246, 0.12);
+      color: var(--blue-accent);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .badge-purple {
+      background: rgba(139, 92, 246, 0.12);
+      color: var(--purple-accent);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    .badge-red {
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--red-accent);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .glass-panel {
+      background: rgba(11, 23, 38, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-dark);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--mint);
+    }
+  </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+
+  <!-- Header Banner -->
+  <header class="max-w-7xl mx-auto mb-8 border-b border-white/10 pb-6">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-[var(--mint)]/10 border border-[var(--mint)]/40 flex items-center justify-center text-[var(--mint)] font-bold text-xl shadow-[0_0_15px_rgba(0,212,168,0.2)]">
+            ⚡
+          </div>
+          <div>
+            <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+              RoleFit AI <span class="text-xs font-semibold px-2 py-0.5 rounded badge-mint uppercase tracking-wider">Live System Architecture</span>
+            </h1>
+            <p class="text-sm text-[var(--text-muted)]">
+              Interactive end-to-end stack workflow simulator & alternative tool rejection analysis
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Simulator Controls -->
+      <div class="flex items-center gap-3 glass-panel p-2 rounded-xl">
+        <button id="btnPlayPause" onclick="toggleSimulation()" class="px-4 py-2 rounded-lg bg-[var(--mint)] text-slate-950 font-bold text-sm hover:bg-[var(--mint)]/90 transition-all flex items-center gap-2 shadow-lg shadow-[var(--mint)]/20">
+          <span id="playIcon">▶</span> <span id="playText">Run Flow Simulation</span>
+        </button>
+        
+        <select id="workflowSelect" onchange="changeWorkflow(this.value)" class="bg-slate-900 border border-white/15 text-white text-xs rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-[var(--mint)]">
+          <option value="wf1">Workflow 1: File Upload & In-Memory Extraction</option>
+          <option value="wf2">Workflow 2: Web Job URL Extraction & Gemini AI</option>
+          <option value="wf3">Workflow 3: Upfront Role Guard & Resume Tailoring</option>
+          <option value="wf4">Workflow 4: Real-Time Keywords & ATS Calculation</option>
+          <option value="wf5">Workflow 5: 1-Click Native Vector PDF Export</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+    <!-- LEFT 8 COLS: INTERACTIVE SYSTEM WORKFLOW MAP -->
+    <section class="lg:col-span-8 flex flex-col gap-6">
+
+      <!-- Live Canvas & Flow Container -->
+      <div class="glass-panel rounded-2xl p-6 relative overflow-hidden min-h-[460px] flex flex-col justify-between">
+        
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-[var(--mint)] animate-ping"></span> Live Execution Pipeline
+          </h2>
+          <span id="activeWfTitle" class="text-xs font-semibold px-2.5 py-1 rounded-full badge-blue">
+            Workflow 1: Resume Upload & Extraction
+          </span>
+        </div>
+
+        <!-- SVG Connection Canvas -->
+        <svg id="svgCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-0">
+          <defs>
+            <linearGradient id="gradMint" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#00D4A8" stop-opacity="0.8"/>
+              <stop offset="100%" stop-color="#3B82F6" stop-opacity="0.8"/>
+            </linearGradient>
+          </defs>
+
+          <!-- Dynamic SVG Paths & Particles rendered by JS -->
+          <g id="svgPaths"></g>
+          <g id="svgParticles"></g>
+        </svg>
+
+        <!-- Node Layout Grid -->
+        <div class="grid grid-cols-3 gap-6 relative z-10 my-auto">
+
+          <!-- COLUMN 1: PRESENTATION TIER (CLIENT) -->
+          <div class="flex flex-col gap-4">
+            <div class="text-xs font-bold uppercase tracking-wider text-[var(--mint)] mb-1 flex items-center gap-1.5">
+              <span>🖥️</span> Presentation Tier
+            </div>
+
+            <!-- Node 1: React SPA UI -->
+            <div id="node-react-ui" onclick="inspectNode('react-ui')" class="node-card p-4 rounded-xl cursor-pointer">
+              <div class="flex justify-between items-start mb-2">
+                <span class="text-xs font-bold text-white">React 18 SPA</span>
+                <span class="text-[10px] px-2 py-0.5 rounded badge-mint font-semibold">Vite</span>
+              </div>
+              <p class="text-xs text-[var(--text-muted)]">State Management, Interactive Chips, Print Engine</p>
+              <div class="mt-3 text-[11px] text-white/60 font-mono">frontend/src/App.jsx</div>
+            </div>
+
+            <!-- Node 2: Google GSI Auth -->
+            <div id="node-gsi-auth" onclick="inspectNode('gsi-auth')" class="node-card p-4 rounded-xl cursor-pointer">
+              <div class="flex justify-between items-start mb-2">
+                <span class="text-xs font-bold text-white">Google GSI Auth</span>
+                <span class="text-[10px] px-2 py-0.5 rounded badge-blue font-semibold">OAuth 2.0</span>
+              </div>
+              <p class="text-xs text-[var(--text-muted)]">Filled-Black Glassmorphism Native Credential SDK</p>
+              <div class="mt-3 text-[11px] text-white/60 font-mono">frontend/src/App.jsx:L900</div>
+            </div>
+          </div>
+
+          <!-- COLUMN 2: APPLICATION TIER (EXPRESS BACKEND) -->
+          <div class="flex flex-col gap-4">
+            <div class="text-xs font-bold uppercase tracking-wider text-[var(--blue-accent)] mb-1 flex items-center gap-1.5">
+              <span>⚙️</span> Application Tier
+            </div>
+
+            <!-- Node 3: Express Router Proxy -->
+            <div id="node-express-proxy" onclick="inspectNode('express-proxy')" class="node-card p-4 rounded-xl cursor-pointer">
+              <div class="flex justify-between items-start mb-2">
+                <span class="text-xs font-bold text-white">Express API Proxy</span>
+                <span class="text-[10px] px-2 py-0.5 rounded badge-blue font-semibold">Node.js</span>
+              </div>
+              <p class="text-xs text-[var(--text-muted)]">JWT Guard, API Key Isolation, Defensive JSON Sanitizer</p>
+              <div class="mt-3 text-[11px] text-white/60 font-mono">backend/server.js</div>
+            </div>
+
+            <!-- Node 4: File Parsers (Multer/PDF/Docx) -->
+            <div id="node-file-parsers" onclick="inspectNode('file-parsers')" class="node-card p-4 rounded-xl cursor-pointer">
+              <div class="flex justify-between items-start mb-2">
+                <span class="text-xs font-bold text-white">In-Memory Parsers</span>
+                <span class="text-[10px] px-2 py-0.5 rounded badge-purple font-semibold">Multer/PDF</span>
+              </div>
+              <p class="text-xs text-[var(--text-muted)]">pdf-parse & mammoth in RAM (Zero Disk Persistence)</p>
+              <div class="mt-3 text-[11px] text-white/60 font-mono">backend/routes/profile.js</div>
+            </div>
+
+            <!-- Node 5: Web Scraper & Cleaners -->
+            <div id="node-web-scraper" onclick="inspectNode('web-scraper')" class="node-card p-4 rounded-xl cursor-pointer">
+              <div class="flex justify-between items-start mb-2">
+                <span class="text-xs font-bold text-white">Job URL Scraper</span>
+                <span class="text-[10px] px-2 py-0.5 rounded badge-purple font-semibold">Node Fetch</span>
+              </div>
+              <p class="text-xs text-[var(--text-muted)]">Fetch + AbortSignal + Regex HTML DOM Cleaner</p>
+              <div class="mt-3 text-[11px] text-white/60 font-mono">backend/routes/profile.js:L101</div>
+            </div>
+          </div>
+
+          <!-- COLUMN 3: DATA TIER & AI ENGINE -->
+          <div class="flex flex-col gap-4">
+            <div class="text-xs font-bold uppercase tracking-wider text-[var(--purple-accent)] mb-1 flex items-center gap-1.5">
+              <span>🧠</span> Data & AI Tier
+            </div>
+
+            <!-- Node 6: Gemini 1.5 Flash -->
+            <div id="node-gemini-ai" onclick="inspectNode('gemini-ai')" class="node-card p-4 rounded-xl cursor-pointer">
+              <div class="flex justify-between items-start mb-2">
+                <span class="text-xs font-bold text-white">Gemini 1.5 Flash</span>
+                <span class="text-[10px] px-2 py-0.5 rounded badge-purple font-semibold">Google AI</span>
+              </div>
+              <p class="text-xs text-[var(--text-muted)]">Zero-Fabrication Prompting, Tailoring & JD Extractor</p>
+              <div class="mt-3 text-[11px] text-white/60 font-mono">backend/routes/resume.js</div>
+            </div>
+
+            <!-- Node 7: Deterministic ATS Engine -->
+            <div id="node-ats-engine" onclick="inspectNode('ats-engine')" class="node-card p-4 rounded-xl cursor-pointer">
+              <div class="flex justify-between items-start mb-2">
+                <span class="text-xs font-bold text-white">ATS Math Engine</span>
+                <span class="text-[10px] px-2 py-0.5 rounded badge-mint font-semibold">Deterministic</span>
+              </div>
+              <p class="text-xs text-[var(--text-muted)]">Score Math (Matched / Total * 100), 3-Tier Chip Logic</p>
+              <div class="mt-3 text-[11px] text-white/60 font-mono">backend/routes/ats.js:L246</div>
+            </div>
+
+            <!-- Node 8: MongoDB Atlas -->
+            <div id="node-mongodb-atlas" onclick="inspectNode('mongodb-atlas')" class="node-card p-4 rounded-xl cursor-pointer">
+              <div class="flex justify-between items-start mb-2">
+                <span class="text-xs font-bold text-white">MongoDB Atlas</span>
+                <span class="text-[10px] px-2 py-0.5 rounded badge-blue font-semibold">Mongoose</span>
+              </div>
+              <p class="text-xs text-[var(--text-muted)]">User Credentials & Saved Resume Document Store</p>
+              <div class="mt-3 text-[11px] text-white/60 font-mono">backend/models/Resume.js</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Simulation Progress & Live Log Footer -->
+        <div class="mt-6 pt-4 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-white">Current Flow State:</span>
+            <span id="simulationStepText" class="text-[var(--mint)] font-mono">Idle — Click "Run Flow Simulation" above</span>
+          </div>
+          <div class="flex items-center gap-2 font-mono text-[11px]">
+            <span>Latency: <strong id="flowLatency" class="text-white">-- ms</strong></span>
+            <span>|</span>
+            <span>Security: <strong class="text-[var(--mint)]">100% In-Memory</strong></span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- PAGE SECTIONS & WORKFLOW CONNECTIONS -->
+      <div class="glass-panel rounded-2xl p-6">
+        <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+          <span>📖</span> RoleFit AI Page Sections & Stack Connections
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+          <!-- Section 1: Auth & Login View -->
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-white/10">
+            <h4 class="text-xs font-bold text-[var(--mint)] mb-1">1. Authentication View</h4>
+            <p class="text-xs text-[var(--text-muted)] mb-3">Email/Password login + Google OAuth 2.0 Credential button.</p>
+            <div class="space-y-1.5 text-[11px]">
+              <div class="flex justify-between text-white/80"><span>Frontend:</span> <strong class="text-white">React + Google GSI</strong></div>
+              <div class="flex justify-between text-white/80"><span>Backend:</span> <strong class="text-white">Express + bcrypt + JWT</strong></div>
+              <div class="flex justify-between text-white/80"><span>Database:</span> <strong class="text-white">MongoDB User Model</strong></div>
+            </div>
+          </div>
+
+          <!-- Section 2: Input Generator View -->
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-white/10">
+            <h4 class="text-xs font-bold text-[var(--blue-accent)] mb-1">2. Input & Scraping View</h4>
+            <p class="text-xs text-[var(--text-muted)] mb-3">Resume file upload, Job link scraper, Upfront Eligibility Guard.</p>
+            <div class="space-y-1.5 text-[11px]">
+              <div class="flex justify-between text-white/80"><span>Parsers:</span> <strong class="text-white">pdf-parse, mammoth</strong></div>
+              <div class="flex justify-between text-white/80"><span>Scraper:</span> <strong class="text-white">Fetch + Regex + Gemini</strong></div>
+              <div class="flex justify-between text-white/80"><span>Guard:</span> <strong class="text-white">&lt;45% ATS Pre-check</strong></div>
+            </div>
+          </div>
+
+          <!-- Section 3: Interactive Results & Editor View -->
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-white/10">
+            <h4 class="text-xs font-bold text-[var(--purple-accent)] mb-1">3. Results & PDF Workspace</h4>
+            <p class="text-xs text-[var(--text-muted)] mb-3">Interactive keyword chips, live editor, PDF print engine.</p>
+            <div class="space-y-1.5 text-[11px]">
+              <div class="flex justify-between text-white/80"><span>AI Engine:</span> <strong class="text-white">Gemini 1.5 Flash Proxy</strong></div>
+              <div class="flex justify-between text-white/80"><span>ATS Math:</span> <strong class="text-white">Deterministic Scoring</strong></div>
+              <div class="flex justify-between text-white/80"><span>PDF Export:</span> <strong class="text-white">Native @media print</strong></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT 4 COLS: STACK INSPECTOR & ALTERNATIVE TOOL REJECTION ANALYSIS -->
+    <aside class="lg:col-span-4 flex flex-col gap-6">
+
+      <!-- Inspector Header Card -->
+      <div class="glass-panel rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <span>🔬</span> Stack & Tool Inspector
+          </h3>
+          <span id="inspectBadge" class="text-[10px] font-bold px-2 py-0.5 rounded badge-mint uppercase">
+            Click any node
+          </span>
+        </div>
+
+        <div id="inspectorContent">
+          <!-- Default State when no node is selected -->
+          <div class="text-center py-8 text-[var(--text-muted)]">
+            <div class="text-3xl mb-2">👆</div>
+            <p class="text-xs leading-relaxed">
+              Click on any component node in the execution diagram to inspect its <strong>Tech Stack Details</strong>, <strong>Code File Locations</strong>, and <strong>Why Alternative Tools Were Rejected</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Comparison Summary Table -->
+      <div class="glass-panel rounded-2xl p-6">
+        <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+          <span>⚖️</span> Why Alternative Tools Were Rejected
+        </h3>
+
+        <div class="space-y-3 text-xs">
+
+          <div class="p-3 rounded-lg bg-slate-900/60 border border-white/5">
+            <div class="flex justify-between font-bold mb-1">
+              <span class="text-white">Server-Side Express Proxy</span>
+              <span class="text-[var(--red-accent)]">vs. Client-Side Gemini</span>
+            </div>
+            <p class="text-[11px] text-[var(--text-muted)] leading-normal">
+              <strong>Rejected Client-Side API:</strong> Exposes Gemini API keys in browser network requests. Express Proxy isolates key in server environment variables and enables JSON sanitization.
+            </p>
+          </div>
+
+          <div class="p-3 rounded-lg bg-slate-900/60 border border-white/5">
+            <div class="flex justify-between font-bold mb-1">
+              <span class="text-white">Node Fetch + Gemini Scraper</span>
+              <span class="text-[var(--red-accent)]">vs. Puppeteer / Selenium</span>
+            </div>
+            <p class="text-[11px] text-[var(--text-muted)] leading-normal">
+              <strong>Rejected Puppeteer:</strong> Heavy 300MB headless Chromium binary fails on Vercel serverless limits. Fetch + Gemini AI strips ads and cookie popups dynamically.
+            </p>
+          </div>
+
+          <div class="p-3 rounded-lg bg-slate-900/60 border border-white/5">
+            <div class="flex justify-between font-bold mb-1">
+              <span class="text-white">In-Memory RAM Buffer</span>
+              <span class="text-[var(--red-accent)]">vs. Disk File Uploads</span>
+            </div>
+            <p class="text-[11px] text-[var(--text-muted)] leading-normal">
+              <strong>Rejected Local Storage:</strong> Saving resumes on server disk creates privacy vulnerabilities. `memoryStorage` processes buffers in RAM and discards them immediately.
+            </p>
+          </div>
+
+          <div class="p-3 rounded-lg bg-slate-900/60 border border-white/5">
+            <div class="flex justify-between font-bold mb-1">
+              <span class="text-white">Native @media print</span>
+              <span class="text-[var(--red-accent)]">vs. jsPDF / html2canvas</span>
+            </div>
+            <p class="text-[11px] text-[var(--text-muted)] leading-normal">
+              <strong>Rejected jsPDF:</strong> Canvas rasterization converts text into flat pixel images, rendering PDFs unreadable by ATS scanners. Native print generates vector PDFs with selectable text.
+            </p>
+          </div>
+
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Interactive JavaScript Architecture Controller -->
+  <script>
+    // Node Specifications & Stack Data Dictionary
+    const stackData = {
+      'react-ui': {
+        title: 'React 18 Single-Page Application (Vite)',
+        category: 'Presentation Tier',
+        codePath: 'frontend/src/App.jsx',
+        stack: ['React 18', 'Vite', 'CSS HSL Tokens', 'Controlled Form State'],
+        purpose: 'Renders the responsive dark-glassmorphism workspace, manages state for resume tailoring, displays real-time keyword chips, and controls PDF export.',
+        whyChosen: 'Vite provides ultra-fast HMR builds (<400ms). React controlled state ensures synchronized live text updates across editors and PDF preview components.',
+        whyRejected: 'Next.js SSR was rejected because RoleFit AI is an interactive client workspace behind JWT authentication; static SSR adds unnecessary server rendering overhead without SEO benefit.'
+      },
+      'gsi-auth': {
+        title: 'Google GSI Authentication SDK',
+        category: 'Authentication Module',
+        codePath: 'frontend/src/App.jsx:L900-L950',
+        stack: ['Google Identity Services (GSI)', 'OAuth 2.0', 'JWT Bearer Tokens', 'Filled-Black Theme'],
+        purpose: 'Provides 1-click Google Sign-In with an integrated filled-black dark glassmorphism container.',
+        whyChosen: 'Native GSI SDK avoids popups and provides seamless 1-click authentication compliant with modern security standards.',
+        whyRejected: 'Custom OAuth redirect popups were rejected due to aggressive browser popup blockers that disrupt candidate registration.'
+      },
+      'express-proxy': {
+        title: 'Express API Server-Side Proxy',
+        category: 'Application Tier',
+        codePath: 'backend/server.js & backend/routes/',
+        stack: ['Node.js', 'Express', 'JWT Middleware', 'Cors', 'Express Rate Limit'],
+        purpose: 'Acts as a secure backend proxy to isolate Gemini API keys, authenticate JWT tokens, sanitize inputs, and prevent client key leakage.',
+        whyChosen: 'Isolates sensitive credentials in server environment variables. Enables defensive JSON stripping of markdown wrappers before returning data.',
+        whyRejected: 'Direct client-side Gemini API calls were strictly rejected because browser network inspection tools reveal API keys to end users.'
+      },
+      'file-parsers': {
+        title: 'In-Memory Resume Parsers',
+        category: 'Data Extraction Module',
+        codePath: 'backend/routes/profile.js:L10-L99',
+        stack: ['Multer (memoryStorage)', 'pdf-parse', 'mammoth (Docx XML)'],
+        purpose: 'Receives PDF, Word (.docx), and TXT files, parses raw binary streams into text, and validates document readability.',
+        whyChosen: '`pdf-parse` reads PDF binary streams in milliseconds. `mammoth` extracts paragraphs from OpenXML (`document.xml`). RAM storage guarantees candidate privacy.',
+        whyRejected: 'Cloud OCR APIs (Tesseract JS / Google Vision) were rejected for text documents because they are 20x slower and expensive, whereas binary parsing is instant.'
+      },
+      'web-scraper': {
+        title: 'Automated Job URL Scraper & AI Filter',
+        category: 'Data Extraction Module',
+        codePath: 'backend/routes/profile.js:L101-L198',
+        stack: ['Node native fetch', 'AbortSignal.timeout(12000)', 'Regex DOM Sanitizer', 'Gemini 1.5 Flash'],
+        purpose: 'Fetches job posting HTML (LinkedIn, Indeed, Naukri, Glassdoor), strips boilerplate HTML tags, and uses Gemini to isolate core Job Description text.',
+        whyChosen: 'Native Node fetch with custom User-Agent and timeout prevents hanging requests. Gemini AI dynamic filtering strips cookies, footers, and ads automatically.',
+        whyRejected: 'Puppeteer / Selenium headless browsers were rejected because the 300MB Chromium binary exceeds Vercel serverless deployment size limits.'
+      },
+      'gemini-ai': {
+        title: 'Google Gemini 1.5 Flash AI Engine',
+        category: 'AI Engine',
+        codePath: 'backend/routes/resume.js:L30-L120',
+        stack: ['@google/generative-ai SDK', 'Zero-Fabrication Prompting', 'JSON Schema Enforcement'],
+        purpose: 'Tailors candidate work experience bullet points to match target job responsibilities without inventing fake roles, unearned degrees, or fraudulent skills.',
+        whyChosen: 'Gemini 1.5 Flash offers 1M token context windows, fast sub-2s latency, affordable pricing, and superior JSON output compliance.',
+        whyRejected: 'Unrestricted ChatGPT/OpenAI API was rejected due to higher cost and frequent hallucinations inventing unearned work history.'
+      },
+      'ats-engine': {
+        title: 'Deterministic ATS Keyword & Math Engine',
+        category: 'Core Analytics Module',
+        codePath: 'backend/routes/ats.js:L245-L248',
+        stack: ['Deterministic Taxonomy Sets', 'Regex Word Boundaries', 'Score Math: (Matched/Total)*100'],
+        purpose: 'Extracts core job keywords, verifies presence in candidate text, calculates exact percentage alignment, and classifies terms into Matched, Safe to Add, and Skill Gaps.',
+        whyChosen: 'Deterministic math produces 100% reproducible, transparent results candidates can trust. Prevents opaque AI score fluctuations.',
+        whyRejected: 'Opaque LLM-generated ATS scores were rejected because AI produces inconsistent scores for the exact same input on repeated runs.'
+      },
+      'mongodb-atlas': {
+        title: 'MongoDB Atlas Cloud Database',
+        category: 'Data Tier',
+        codePath: 'backend/models/User.js & Resume.js',
+        stack: ['MongoDB Atlas', 'Mongoose ODM', 'Foreign Key (ObjectId) Refs'],
+        purpose: 'Stores candidate account credentials and saved tailored resume documents with user ownership references.',
+        whyChosen: 'Mongoose schema validation ensures structured documents while allowing flexible JSON storage for complex resume sections.',
+        whyRejected: 'Relational SQL databases (PostgreSQL/MySQL) were rejected because resume data structures are naturally document-oriented JSON trees.'
+      }
+    };
+
+    // Flow Simulation Data Pipeline Configurations
+    const workflows = {
+      wf1: {
+        title: 'Workflow 1: File Upload & In-Memory Extraction',
+        nodes: ['react-ui', 'express-proxy', 'file-parsers', 'react-ui'],
+        status: 'Parsing binary PDF/Word buffer in server RAM...',
+        latency: '320 ms'
+      },
+      wf2: {
+        title: 'Workflow 2: Web Job URL Extraction & Gemini AI',
+        nodes: ['react-ui', 'express-proxy', 'web-scraper', 'gemini-ai', 'react-ui'],
+        status: 'Fetching webpage HTML, stripping DOM boilerplate & isolating JD with Gemini...',
+        latency: '1,450 ms'
+      },
+      wf3: {
+        title: 'Workflow 3: Upfront Role Guard & Resume Tailoring',
+        nodes: ['react-ui', 'express-proxy', 'ats-engine', 'gemini-ai', 'mongodb-atlas', 'react-ui'],
+        status: 'Pre-verifying eligibility (≥45%), running Zero-Fabrication prompt, saving to Atlas...',
+        latency: '2,100 ms'
+      },
+      wf4: {
+        title: 'Workflow 4: Real-Time Keywords & ATS Calculation',
+        nodes: ['react-ui', 'express-proxy', 'ats-engine', 'react-ui'],
+        status: 'Running Score = (Matched / Total) * 100 & categorizing 3-tier chips...',
+        latency: '180 ms'
+      },
+      wf5: {
+        title: 'Workflow 5: 1-Click Native Vector PDF Export',
+        nodes: ['react-ui'],
+        status: 'Invoking window.print() with @media print CSS rules for vector ATS PDF...',
+        latency: '45 ms'
+      }
+    };
+
+    let activeWorkflow = 'wf1';
+    let isSimulating = false;
+    let simInterval = null;
+    let currentStep = 0;
+
+    // Initialize Page
+    window.addEventListener('DOMContentLoaded', () => {
+      inspectNode('react-ui');
+      renderCanvasPaths();
+      window.addEventListener('resize', renderCanvasPaths);
+    });
+
+    // Inspect Node Details
+    function inspectNode(nodeKey) {
+      document.querySelectorAll('.node-card').forEach(n => n.classList.remove('active'));
+      const targetNode = document.getElementById(`node-${nodeKey}`);
+      if (targetNode) targetNode.classList.add('active');
+
+      const data = stackData[nodeKey];
+      if (!data) return;
+
+      const badgeColor = data.category.includes('Presentation') ? 'badge-mint' : data.category.includes('Application') ? 'badge-blue' : 'badge-purple';
+
+      document.getElementById('inspectBadge').className = `text-[10px] font-bold px-2 py-0.5 rounded uppercase ${badgeColor}`;
+      document.getElementById('inspectBadge').innerText = data.category;
+
+      const html = `
+        <div class="space-y-4 animate-fadeIn">
+          <div>
+            <h4 class="text-base font-bold text-white mb-1">${data.title}</h4>
+            <div class="text-[11px] font-mono text-[var(--mint)] bg-[var(--mint)]/10 px-2 py-1 rounded border border-[var(--mint)]/20 inline-block">
+              📍 ${data.codePath}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Technologies Used</div>
+            <div class="flex flex-wrap gap-1.5">
+              ${data.stack.map(s => `<span class="text-[11px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white font-medium">${s}</span>`).join('')}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">Module Purpose</div>
+            <p class="text-xs text-white/80 leading-relaxed">${data.purpose}</p>
+          </div>
+
+          <div class="p-3 rounded-xl bg-[var(--mint)]/5 border border-[var(--mint)]/20">
+            <div class="text-[11px] font-bold text-[var(--mint)] mb-1 flex items-center gap-1">
+              <span>✅</span> Why This Tool Was Selected
+            </div>
+            <p class="text-xs text-white/90 leading-relaxed">${data.whyChosen}</p>
+          </div>
+
+          <div class="p-3 rounded-xl bg-red-500/5 border border-red-500/20">
+            <div class="text-[11px] font-bold text-[var(--red-accent)] mb-1 flex items-center gap-1">
+              <span>❌</span> Why Alternative Tools Were Rejected
+            </div>
+            <p class="text-xs text-white/90 leading-relaxed">${data.whyRejected}</p>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('inspectorContent').innerHTML = html;
+    }
+
+    // Change Selected Workflow
+    function changeWorkflow(wfKey) {
+      activeWorkflow = wfKey;
+      currentStep = 0;
+      const wf = workflows[wfKey];
+      document.getElementById('activeWfTitle').innerText = wf.title;
+      document.getElementById('simulationStepText').innerText = `Selected: ${wf.title}`;
+      document.getElementById('flowLatency').innerText = wf.latency;
+      renderCanvasPaths();
+    }
+
+    // Toggle Simulation Run
+    function toggleSimulation() {
+      isSimulating = !isSimulating;
+      const btn = document.getElementById('btnPlayPause');
+      const icon = document.getElementById('playIcon');
+      const text = document.getElementById('playText');
+
+      if (isSimulating) {
+        icon.innerText = '⏸';
+        text.innerText = 'Pause Simulation';
+        btn.classList.add('bg-amber-500', 'text-slate-950');
+        btn.classList.remove('bg-[var(--mint)]');
+        runSimulationStep();
+        simInterval = setInterval(runSimulationStep, 1200);
+      } else {
+        icon.innerText = '▶';
+        text.innerText = 'Resume Simulation';
+        btn.classList.remove('bg-amber-500');
+        btn.classList.add('bg-[var(--mint)]');
+        clearInterval(simInterval);
+      }
+    }
+
+    // Run Single Simulation Step
+    function runSimulationStep() {
+      const wf = workflows[activeWorkflow];
+      const nodeList = wf.nodes;
+
+      const currentNodeKey = nodeList[currentStep];
+      inspectNode(currentNodeKey);
+
+      document.getElementById('simulationStepText').innerText = `Step ${currentStep + 1} of ${nodeList.length}: Active on [${stackData[currentNodeKey].title}]`;
+
+      currentStep = (currentStep + 1) % nodeList.length;
+    }
+
+    // SVG Connections Render Engine
+    function renderCanvasPaths() {
+      const svgPaths = document.getElementById('svgPaths');
+      const svgParticles = document.getElementById('svgParticles');
+      if (!svgPaths || !svgParticles) return;
+
+      svgPaths.innerHTML = '';
+      svgParticles.innerHTML = '';
+
+      const wf = workflows[activeWorkflow];
+      const nodes = wf.nodes;
+
+      for (let i = 0; i < nodes.length - 1; i++) {
+        const fromNode = document.getElementById(`node-${nodes[i]}`);
+        const toNode = document.getElementById(`node-${nodes[i+1]}`);
+
+        if (fromNode && toNode) {
+          const rect1 = fromNode.getBoundingClientRect();
+          const rect2 = toNode.getBoundingClientRect();
+          const container = document.getElementById('svgCanvas').getBoundingClientRect();
+
+          const x1 = rect1.left + rect1.width / 2 - container.left;
+          const y1 = rect1.top + rect1.height / 2 - container.top;
+          const x2 = rect2.left + rect2.width / 2 - container.left;
+          const y2 = rect2.top + rect2.height / 2 - container.top;
+
+          // Draw SVG Connection Line
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          const dx = Math.abs(x2 - x1) * 0.5;
+          const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+
+          path.setAttribute('d', d);
+          path.setAttribute('stroke', 'url(#gradMint)');
+          path.setAttribute('stroke-width', '2');
+          path.setAttribute('fill', 'none');
+          path.setAttribute('class', 'flow-line');
+          svgPaths.appendChild(path);
+
+          // Draw Animated Pulse Particle
+          const particle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          particle.setAttribute('r', '5');
+          particle.setAttribute('fill', '#00D4A8');
+          particle.setAttribute('class', 'pulse-particle');
+
+          const anim = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
+          anim.setAttribute('path', d);
+          anim.setAttribute('dur', '1.8s');
+          anim.setAttribute('repeatCount', 'indefinite');
+          particle.appendChild(anim);
+
+          svgParticles.appendChild(particle);
+        }
+      }
+    }
+  </script>
+</body>
+</html>

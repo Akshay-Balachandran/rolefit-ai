@@ -74,26 +74,128 @@ export const extractKeywords = (jobDescription, limit = 25) => {
     .slice(0, limit);
 };
 
-// Helper: Verifies if a term or word boundary exists within the candidate's resume text
+// ── NLP STAGE 1: MORPHOLOGICAL STEMMER / LEMMATIZER ──
+// Reduces English word variations (plurals, verb tenses, conjugations) to their morphological stem
+export const stemWord = (word) => {
+  if (!word || typeof word !== 'string') return '';
+  let w = word.toLowerCase().trim();
+  if (w.length <= 3) return w;
+
+  // Common suffix reductions
+  if (w.endsWith('ing') && w.length > 5) w = w.slice(0, -3);
+  else if (w.endsWith('ed') && w.length > 4) w = w.slice(0, -2);
+  else if (w.endsWith('es') && w.length > 4) w = w.slice(0, -2);
+  else if (w.endsWith('s') && !w.endsWith('ss') && w.length > 3) w = w.slice(0, -1);
+  else if (w.endsWith('tion') && w.length > 6) w = w.slice(0, -4) + 't';
+  else if (w.endsWith('ment') && w.length > 6) w = w.slice(0, -4);
+  else if (w.endsWith('ability') && w.length > 7) w = w.slice(0, -7) + 'able';
+  else if (w.endsWith('ively') && w.length > 6) w = w.slice(0, -5);
+  else if (w.endsWith('ers') && w.length > 5) w = w.slice(0, -3);
+  else if (w.endsWith('er') && w.length > 4) w = w.slice(0, -2);
+
+  return w;
+};
+
+// Helper: Converts a multi-word phrase into a stemmed canonical string
+export const stemPhrase = (phrase) => {
+  if (!phrase) return '';
+  return phrase
+    .toLowerCase()
+    .split(/[\s-]+/)
+    .filter(w => w.length > 1 && !STOP_WORDS.has(w))
+    .map(w => stemWord(w))
+    .sort()
+    .join(' ');
+};
+
+// ── NLP STAGE 2: ACRONYM & SYNONYM CONCEPT CANONICALIZATION ──
+// Maps technical acronyms, tool variations, and industry synonyms to a unique Concept ID
+export const CONCEPT_SYNONYMS = {
+  javascript: ['javascript', 'js', 'ecmascript'],
+  typescript: ['typescript', 'ts'],
+  kubernetes: ['kubernetes', 'k8s', 'kube'],
+  aws: ['aws', 'amazon web services', 'amazon aws'],
+  gcp: ['gcp', 'google cloud platform', 'google cloud'],
+  azure: ['azure', 'microsoft azure'],
+  docker: ['docker', 'containerization', 'containers', 'containerized'],
+  rest_api: ['rest api', 'restful api', 'restful apis', 'rest apis', 'restful web services', 'api design', 'apis'],
+  python: ['python', 'py'],
+  react: ['react', 'reactjs', 'react.js'],
+  node: ['node', 'nodejs', 'node.js'],
+  ci_cd: ['ci/cd', 'cicd', 'continuous integration', 'continuous deployment'],
+  agile: ['agile', 'scrum', 'kanban'],
+  qa_testing: ['qa', 'testing', 'manual testing', 'automation testing', 'test automation', 'sdet', 'quality assurance', 'regression testing'],
+  machine_learning: ['machine learning', 'ml'],
+  nlp: ['nlp', 'natural language processing'],
+  generative_ai: ['generative ai', 'genai', 'llm', 'llms', 'large language models'],
+  sql: ['sql', 'plsql', 'relational database', 'rdbms'],
+  nosql: ['nosql', 'mongodb', 'mongo', 'dynamodb', 'redis']
+};
+
+// Helper: Resolves a term to its canonical Concept ID if present in taxonomy
+export const getCanonicalConcept = (term) => {
+  if (!term) return null;
+  const lower = term.toLowerCase().trim();
+  for (const [conceptKey, synonyms] of Object.entries(CONCEPT_SYNONYMS)) {
+    if (synonyms.some(s => s === lower || lower.includes(s))) {
+      return conceptKey;
+    }
+  }
+  return null;
+};
+
+// Helper: Verifies if a term or word boundary or semantic lemma exists within candidate resume text
 const isTermInResume = (term, resumeText) => {
   if (!term || !resumeText) return false;
   const cleanTerm = term.toLowerCase().trim();
   const resumeLower = resumeText.toLowerCase();
 
+  // 1. Short acronym regex word boundary check (e.g. "AI", "ML", "Git", "AWS", "K8s")
   if (cleanTerm.length <= 3) {
-    // Word boundary check for short terms like "AI", "ML", "Git", "Jira", "AWS"
     const escaped = cleanTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`(?:^|[^a-zA-Z0-9])${escaped}(?:$|[^a-zA-Z0-9])`, 'i');
-    return regex.test(resumeText);
+    if (regex.test(resumeText)) return true;
   }
 
-  // Check full string match
+  // 2. Direct string inclusion check
   if (resumeLower.includes(cleanTerm)) return true;
 
-  // Check if all main words of a multi-word term are in resume (e.g. "manual testing" -> resume has "manual" and "testing")
+  // 3. NLP Stage 2: Concept Canonicalization Synonym Check
+  const conceptKey = getCanonicalConcept(cleanTerm);
+  if (conceptKey) {
+    const synonyms = CONCEPT_SYNONYMS[conceptKey] || [];
+    for (const syn of synonyms) {
+      if (syn.length <= 3) {
+        const escaped = syn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(?:^|[^a-zA-Z0-9])${escaped}(?:$|[^a-zA-Z0-9])`, 'i');
+        if (regex.test(resumeText)) return true;
+      } else if (resumeLower.includes(syn)) {
+        return true;
+      }
+    }
+  }
+
+  // 4. NLP Stage 1: Stemmed Lemma Phrase Matching
+  const stemmedTermPhrase = stemPhrase(cleanTerm);
+  if (stemmedTermPhrase) {
+    const stemmedResumePhrase = stemPhrase(resumeText);
+    if (stemmedResumePhrase.includes(stemmedTermPhrase)) return true;
+
+    // Check if individual stemmed tokens exist in resume
+    const termTokens = stemmedTermPhrase.split(' ');
+    if (termTokens.length >= 1) {
+      const resumeWords = resumeLower.split(/[\s-]+/).map(w => stemWord(w));
+      const resumeWordSet = new Set(resumeWords);
+      if (termTokens.every(token => resumeWordSet.has(token))) {
+        return true;
+      }
+    }
+  }
+
+  // 5. Token-split check for multi-word terms
   const words = cleanTerm.split(/[\s-]+/).filter(w => w.length > 2 && !STOP_WORDS.has(w));
   if (words.length >= 2) {
-    return words.every(w => resumeLower.includes(w));
+    return words.every(w => resumeLower.includes(w) || isTermInResume(w, resumeText));
   }
 
   return false;
